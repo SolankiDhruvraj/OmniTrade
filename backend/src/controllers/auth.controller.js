@@ -174,10 +174,11 @@ export const twoFactorDisableSchema = z.object({
 const sendAuth = (res, user) => {
   const csrfToken = crypto.randomBytes(32).toString("hex");
   const token = signToken(user._id, csrfToken);
+  const isProduction = process.env.NODE_ENV === "production";
   res.cookie("token", token, {
     httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    sameSite: isProduction ? "none" : "lax",
+    secure: isProduction,
     maxAge: 7 * 24 * 60 * 60 * 1000,
   });
 
