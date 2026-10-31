@@ -33,7 +33,7 @@ export class ZerodhaBrokerAdapter {
 
   createClient(credentialsData = "") {
     const creds = parseCredentials(credentialsData);
-    const apiKey = creds.apiKey || env.zerodha.apiKey;
+    const apiKey = creds.apiKey || "";
     const accessToken = creds.accessToken || (typeof credentialsData === "string" ? credentialsData : "");
 
     const kc = new KiteConnect({
@@ -47,8 +47,8 @@ export class ZerodhaBrokerAdapter {
   }
 
   assertConfigured(credentials = {}) {
-    const apiKey = credentials.apiKey || env.zerodha.apiKey;
-    const apiSecret = credentials.apiSecret || env.zerodha.apiSecret;
+    const apiKey = credentials.apiKey;
+    const apiSecret = credentials.apiSecret;
 
     if (!apiKey || !apiSecret) {
       throw new AppError("Zerodha API Key & Secret are required to connect this account. Please enter them in the connection prompt.", 400);

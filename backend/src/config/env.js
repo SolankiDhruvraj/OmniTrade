@@ -56,8 +56,6 @@ export const env = {
     nseFoSymbolMasterUrl: process.env.FYERS_NSE_FO_SYMBOL_MASTER_URL || "https://public.fyers.in/sym_details/NSE_FO.csv",
   },
   zerodha: {
-    apiKey: process.env.ZERODHA_API_KEY || "",
-    apiSecret: process.env.ZERODHA_API_SECRET || "",
     redirectUrl: process.env.ZERODHA_REDIRECT_URL || "http://localhost:8001/api/v1/broker-accounts/zerodha/callback",
   },
   email: {
