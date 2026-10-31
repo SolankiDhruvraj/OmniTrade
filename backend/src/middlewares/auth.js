@@ -5,7 +5,10 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { verifyToken } from "../utils/jwt.js";
 
 export const requireAuth = asyncHandler(async (req, res, next) => {
-  const token = req.cookies?.token;
+  // Support both cookie-based auth AND Authorization: Bearer <token> header (essential for mobile browsers blocking 3rd-party cookies)
+  const authHeader = req.get("Authorization") || "";
+  const headerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : null;
+  const token = req.cookies?.token || headerToken;
 
   if (!token) {
     throw new AppError("Authentication required", 401);
@@ -17,7 +20,7 @@ export const requireAuth = asyncHandler(async (req, res, next) => {
   } catch {
     res.clearCookie("token", {
       httpOnly: true,
-      sameSite: "lax",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
       secure: process.env.NODE_ENV === "production",
       path: "/",
     });

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { apiRequest, setCsrfToken } from '../api/client.js'
+import { apiRequest, setAuthToken, setCsrfToken } from '../api/client.js'
 import { AuthContext } from './auth-context.js'
 
 export const AuthProvider = ({ children }) => {
@@ -7,8 +7,6 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    window.localStorage.removeItem('token')
-
     apiRequest('/auth/me')
       .then((data) => {
         setCsrfToken(data.csrfToken)
@@ -16,6 +14,7 @@ export const AuthProvider = ({ children }) => {
       })
       .catch(() => {
         setCsrfToken('')
+        setAuthToken('')
         setUser(null)
       })
       .finally(() => setLoading(false))
@@ -28,6 +27,7 @@ export const AuthProvider = ({ children }) => {
     })
     if (data.requiresTwoFactor) return data
 
+    if (data.token) setAuthToken(data.token)
     setCsrfToken(data.csrfToken)
     setUser(data.user)
     return data.user
@@ -38,6 +38,7 @@ export const AuthProvider = ({ children }) => {
       method: 'POST',
       body: JSON.stringify(payload),
     })
+    if (data.token) setAuthToken(data.token)
     setCsrfToken(data.csrfToken)
     setUser(data.user)
     return data.user
@@ -48,6 +49,7 @@ export const AuthProvider = ({ children }) => {
       method: 'POST',
       body: JSON.stringify({ challengeToken, code }),
     })
+    if (data.token) setAuthToken(data.token)
     setCsrfToken(data.csrfToken)
     setUser(data.user)
     return data.user
@@ -59,6 +61,7 @@ export const AuthProvider = ({ children }) => {
     } catch {
       // Local logout should still complete if the server session is already gone.
     }
+    setAuthToken('')
     setCsrfToken('')
     setUser(null)
   }

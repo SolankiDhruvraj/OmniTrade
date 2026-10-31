@@ -9,14 +9,25 @@ export class ApiError extends Error {
 }
 
 let csrfToken = ''
+let authToken = window.localStorage.getItem('auth_token') || ''
 
 export const setCsrfToken = (token) => {
   csrfToken = token || ''
 }
 
+export const setAuthToken = (token) => {
+  authToken = token || ''
+  if (token) {
+    window.localStorage.setItem('auth_token', token)
+  } else {
+    window.localStorage.removeItem('auth_token')
+  }
+}
+
 export const apiRequest = async (path, options = {}) => {
   const headers = {
     'Content-Type': 'application/json',
+    ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {}),
     ...(options.headers || {}),
   }
   if (['POST', 'PUT', 'PATCH', 'DELETE'].includes((options.method || 'GET').toUpperCase()) && csrfToken) {

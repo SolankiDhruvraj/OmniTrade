@@ -183,6 +183,7 @@ const sendAuth = (res, user) => {
   });
 
   res.json({
+    token, // Return token directly so mobile browsers blocking 3rd-party cookies can authenticate via Authorization header
     csrfToken,
     user: {
       id: user._id,
