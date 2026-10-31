@@ -281,81 +281,145 @@ export const InvitationsPage = () => {
             <p>No invitations found{appliedSearch ? ` matching "${appliedSearch}"` : ''}.</p>
           </div>
         ) : (
-          <div className="table-responsive">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Invitee Email</th>
-                  <th>Status</th>
-                  <th>Created At</th>
-                  <th>Expires / Accepted At</th>
-                  <th>Invited By</th>
-                  <th style={{ textAlign: 'right' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {invitations.map((inv) => (
-                  <tr key={inv._id}>
-                    <td style={{ fontWeight: 500 }}>{inv.email}</td>
-                    <td>{renderStatusBadge(inv.status)}</td>
-                    <td style={{ fontSize: 13, color: '#555' }}>
-                      {new Date(inv.createdAt).toLocaleString(undefined, {
-                        dateStyle: 'short',
-                        timeStyle: 'short',
-                      })}
-                    </td>
-                    <td style={{ fontSize: 13, color: '#555' }}>
-                      {inv.status === 'accepted' && inv.usedAt ? (
-                        <span title="Accepted timestamp">
-                          {new Date(inv.usedAt).toLocaleString(undefined, {
-                            dateStyle: 'short',
-                            timeStyle: 'short',
-                          })}
-                        </span>
-                      ) : (
-                        <span title="Expiration timestamp">
-                          {new Date(inv.expiresAt).toLocaleString(undefined, {
-                            dateStyle: 'short',
-                            timeStyle: 'short',
-                          })}
-                        </span>
-                      )}
-                    </td>
-                    <td style={{ fontSize: 13, color: '#555' }}>
-                      {inv.createdBy?.name || inv.createdBy?.email || '—'}
-                    </td>
-                    <td style={{ textAlign: 'right' }}>
-                      {inv.status === 'pending' ? (
-                        <button
-                          className="secondary-button"
-                          onClick={() => handleRevoke(inv._id, inv.email)}
-                          disabled={revokingId === inv._id}
-                          style={{
-                            padding: '4px 10px',
-                            fontSize: 12,
-                            color: '#d32f2f',
-                            borderColor: '#ffcdd2',
-                            background: '#ffebee',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: 4,
-                          }}
-                        >
-                          {revokingId === inv._id ? (
-                            <Loader2 size={12} className="spinning" />
-                          ) : (
-                            <Trash2 size={12} />
-                          )}
-                          Revoke
-                        </button>
-                      ) : (
-                        <span style={{ fontSize: 12, color: '#999' }}>—</span>
-                      )}
-                    </td>
+          <div>
+            {/* Desktop Table View */}
+            <div className="table-responsive desktop-table-view">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Invitee Email</th>
+                    <th>Status</th>
+                    <th>Created At</th>
+                    <th>Expires / Accepted At</th>
+                    <th>Invited By</th>
+                    <th style={{ textAlign: 'right' }}>Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {invitations.map((inv) => (
+                    <tr key={inv._id}>
+                      <td style={{ fontWeight: 500 }}>{inv.email}</td>
+                      <td>{renderStatusBadge(inv.status)}</td>
+                      <td style={{ fontSize: 13, color: '#555' }}>
+                        {new Date(inv.createdAt).toLocaleString(undefined, {
+                          dateStyle: 'short',
+                          timeStyle: 'short',
+                        })}
+                      </td>
+                      <td style={{ fontSize: 13, color: '#555' }}>
+                        {inv.status === 'accepted' && inv.usedAt ? (
+                          <span title="Accepted timestamp">
+                            {new Date(inv.usedAt).toLocaleString(undefined, {
+                              dateStyle: 'short',
+                              timeStyle: 'short',
+                            })}
+                          </span>
+                        ) : (
+                          <span title="Expiration timestamp">
+                            {new Date(inv.expiresAt).toLocaleString(undefined, {
+                              dateStyle: 'short',
+                              timeStyle: 'short',
+                            })}
+                          </span>
+                        )}
+                      </td>
+                      <td style={{ fontSize: 13, color: '#555' }}>
+                        {inv.createdBy?.name || inv.createdBy?.email || '—'}
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        {inv.status === 'pending' ? (
+                          <button
+                            className="secondary-button"
+                            onClick={() => handleRevoke(inv._id, inv.email)}
+                            disabled={revokingId === inv._id}
+                            style={{
+                              padding: '4px 10px',
+                              fontSize: 12,
+                              color: '#d32f2f',
+                              borderColor: '#ffcdd2',
+                              background: '#ffebee',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 4,
+                            }}
+                          >
+                            {revokingId === inv._id ? (
+                              <Loader2 size={12} className="spinning" />
+                            ) : (
+                              <Trash2 size={12} />
+                            )}
+                            Revoke
+                          </button>
+                        ) : (
+                          <span style={{ fontSize: 12, color: '#999' }}>—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Card List View */}
+            <div className="mobile-invitations-cards">
+              {invitations.map((inv) => (
+                <div className="invitation-card-mobile" key={inv._id}>
+                  <div className="card-top">
+                    <div>
+                      <strong style={{ fontSize: 14, color: '#111', wordBreak: 'break-all' }}>{inv.email}</strong>
+                      <div style={{ marginTop: 4 }}>{renderStatusBadge(inv.status)}</div>
+                    </div>
+                    {inv.status === 'pending' && (
+                      <button
+                        className="secondary-button"
+                        onClick={() => handleRevoke(inv._id, inv.email)}
+                        disabled={revokingId === inv._id}
+                        style={{
+                          padding: '5px 10px',
+                          fontSize: 12,
+                          color: '#d32f2f',
+                          borderColor: '#ffcdd2',
+                          background: '#ffebee',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                        }}
+                      >
+                        {revokingId === inv._id ? <Loader2 size={12} className="spinning" /> : <Trash2 size={12} />}
+                        Revoke
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="card-meta">
+                    <div>
+                      <small>Created</small>
+                      <span>
+                        {new Date(inv.createdAt).toLocaleString(undefined, {
+                          dateStyle: 'short',
+                          timeStyle: 'short',
+                        })}
+                      </span>
+                    </div>
+
+                    <div>
+                      <small>{inv.status === 'accepted' ? 'Accepted' : 'Expires'}</small>
+                      <span>
+                        {new Date(inv.status === 'accepted' && inv.usedAt ? inv.usedAt : inv.expiresAt).toLocaleString(undefined, {
+                          dateStyle: 'short',
+                          timeStyle: 'short',
+                        })}
+                      </span>
+                    </div>
+
+                    <div style={{ gridColumn: 'span 2' }}>
+                      <small>Invited By</small>
+                      <span>{inv.createdBy?.name || inv.createdBy?.email || '—'}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
 
             {/* Pagination Controls */}
             {pagination.totalPages > 1 && (

@@ -1570,4 +1570,67 @@ tbody tr:hover {
   .kite-pagination-controls {
     justify-content: center;
   }
+
+  /* Responsive Invitations Mobile Cards */
+  .desktop-table-view {
+    display: none !important;
+  }
+
+  .mobile-invitations-cards {
+    display: flex !important;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .invitation-card-mobile {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+  }
+
+  .invitation-card-mobile .card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .invitation-card-mobile .card-meta {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    font-size: 12px;
+    background: #f8fafc;
+    padding: 8px 10px;
+    border-radius: 6px;
+  }
+
+  .invitation-card-mobile .card-meta div {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .invitation-card-mobile .card-meta small {
+    color: #888888;
+    font-size: 11px;
+    text-transform: uppercase;
+    font-weight: 500;
+  }
+
+  .invitation-card-mobile .card-meta span {
+    color: #333333;
+    font-weight: 500;
+  }
+}
+
+@media (min-width: 681px) {
+  .mobile-invitations-cards {
+    display: none !important;
+  }
 }
