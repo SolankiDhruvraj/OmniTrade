@@ -1,0 +1,28 @@
+# Environment and Secrets
+.env
+.env.*
+!.env.example
+
+# Dependencies
+node_modules/
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build outputs
+dist/
+build/
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Admin and Maintenance Scripts
+backend/scripts/reset-admin.js
+*adminreset*
+*reset-admin*
+
