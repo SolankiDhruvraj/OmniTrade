@@ -11,6 +11,9 @@ import orderRoutes from "./src/routes/order.routes.js";
 
 const app = express();
 
+// Trust reverse proxy (Render load balancer) so express-rate-limit and IP detection work correctly
+app.set("trust proxy", 1);
+
 app.use(helmet());
 app.use(cors({
   origin: env.clientUrl,
