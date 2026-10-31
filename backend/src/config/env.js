@@ -59,8 +59,8 @@ export const env = {
     redirectUrl: process.env.ZERODHA_REDIRECT_URL || "http://localhost:8001/api/v1/broker-accounts/zerodha/callback",
   },
   email: {
-    service: process.env.EMAIL_SERVICE || "", // e.g. "gmail" or empty if using host/port
-    resendApiKey: process.env.RESEND_API_KEY || "", // HTTP-based email API (works on Render free tier)
+    service: process.env.EMAIL_SERVICE || "",
+    resendApiKey: process.env.RESEND_API_KEY || "", 
     smtpHost: process.env.SMTP_HOST || "",
     smtpPort: Number(process.env.SMTP_PORT || 587),
     smtpSecure: process.env.SMTP_SECURE === "true",
