@@ -6,25 +6,34 @@ let transporter = null;
 const getTransporter = () => {
   if (transporter) return transporter;
 
-  // Resend or Brevo or Custom SMTP or Gmail
+  // Custom SMTP host (e.g. Brevo / Resend / AWS SES)
   if (env.email.smtpHost) {
     transporter = nodemailer.createTransport({
       host: env.email.smtpHost,
       port: env.email.smtpPort,
-      secure: env.email.smtpSecure, // true for 465, false for 587 / other ports
+      secure: env.email.smtpSecure, // true for 465, false for 587
       auth: {
         user: env.email.smtpUser,
         pass: env.email.smtpPass,
       },
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 15000,
     });
-  } else if (env.email.service || env.email.smtpUser) {
-    // Default to Gmail or configured service
+  } else if (env.email.service === "gmail" || env.email.smtpUser) {
+    // Explicit Gmail SMTP configuration using port 465 (SSL)
+    // Port 465 avoids cloud host blocks on default port 587
     transporter = nodemailer.createTransport({
-      service: env.email.service || "gmail",
+      host: "smtp.gmail.com",
+      port: 465,
+      secure: true,
       auth: {
         user: env.email.smtpUser,
         pass: env.email.smtpPass,
       },
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 15000,
     });
   }
 
