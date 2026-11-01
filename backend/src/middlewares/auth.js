@@ -5,7 +5,6 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { verifyToken } from "../utils/jwt.js";
 
 export const requireAuth = asyncHandler(async (req, res, next) => {
-  // Support both cookie-based auth AND Authorization: Bearer <token> header (essential for mobile browsers blocking 3rd-party cookies)
   const authHeader = req.get("Authorization") || "";
   const headerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : null;
   const token = req.cookies?.token || headerToken;

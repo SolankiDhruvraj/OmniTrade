@@ -175,7 +175,13 @@ export const createBrokerAccountSchema = z.object({
 
 export const getFyersAuthUrl = asyncHandler(async (req, res) => {
   const adapter = BrokerFactory.getBroker("fyers");
-  res.json({ url: adapter.getAuthUrl() });
+  const authUrl = adapter.getAuthUrl();
+
+  // Embed user ID in signed state token so callback works across all browsers (including mobile)
+  const stateToken = signOAuthState({ sub: String(req.user._id) });
+  const urlWithState = `${authUrl}&state=${encodeURIComponent(stateToken)}`;
+
+  res.json({ url: urlWithState });
 });
 
 export const handleFyersCallback = asyncHandler(async (req, res) => {
@@ -186,8 +192,23 @@ export const handleFyersCallback = asyncHandler(async (req, res) => {
     return res.redirect(`${env.clientUrl}/accounts?connected=false&message=${encodeURIComponent(message)}`);
   }
 
+  let userId = req.user?._id;
+  const stateToken = req.validated.query.state;
+  if (stateToken) {
+    try {
+      const stateData = verifyOAuthState(stateToken);
+      if (!userId) userId = stateData.sub;
+    } catch (err) {
+      console.warn("Fyers OAuth state token expired or invalid:", err.message);
+    }
+  }
+
+  if (!userId) {
+    return res.redirect(`${env.clientUrl}/accounts?connected=false&message=${encodeURIComponent("Could not identify user. Please sign in and connect again.")}`);
+  }
+
   const account = await connectBrokerAccount({
-    userId: req.user._id,
+    userId,
     broker: "fyers",
     authCode,
   });
