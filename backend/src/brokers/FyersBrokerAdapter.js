@@ -55,12 +55,12 @@ export class FyersBrokerAdapter {
     return { appId, secretKey, redirectUrl };
   }
 
-  getAuthUrl(customCredentials = {}) {
+  getAuthUrl(customCredentials = {}, state = "") {
     const config = this.assertConfigured(customCredentials);
     const fyers = new fyersModel();
     fyers.setAppId(config.appId);
     fyers.setRedirectUrl(config.redirectUrl);
-    return fyers.generateAuthCode();
+    return fyers.generateAuthCode(state ? { state } : undefined);
   }
 
   async exchangeAuthCode(authCode, customCredentials = {}) {

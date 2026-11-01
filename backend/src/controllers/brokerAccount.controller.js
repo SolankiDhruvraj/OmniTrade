@@ -175,13 +175,11 @@ export const createBrokerAccountSchema = z.object({
 
 export const getFyersAuthUrl = asyncHandler(async (req, res) => {
   const adapter = BrokerFactory.getBroker("fyers");
-  const authUrl = adapter.getAuthUrl();
-
   // Embed user ID in signed state token so callback works across all browsers (including mobile)
   const stateToken = signOAuthState({ sub: String(req.user._id) });
-  const urlWithState = `${authUrl}&state=${encodeURIComponent(stateToken)}`;
+  const authUrl = adapter.getAuthUrl({}, stateToken);
 
-  res.json({ url: urlWithState });
+  res.json({ url: authUrl });
 });
 
 export const handleFyersCallback = asyncHandler(async (req, res) => {
