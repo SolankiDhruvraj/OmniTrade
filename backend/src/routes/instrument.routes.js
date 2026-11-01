@@ -3,6 +3,8 @@ import {
 	getFyersInstrumentSyncStatus,
 	optionChain,
 	optionChainSchema,
+	getCandles,
+	candlesSchema,
 	search,
 	searchSchema,
 	syncFyersInstruments,
@@ -17,5 +19,6 @@ router.post("/sync/fyers", syncFyersInstruments);
 router.get("/sync/fyers/:jobId", getFyersInstrumentSyncStatus);
 router.get("/search", validate(searchSchema), search);
 router.get("/option-chain", validate(optionChainSchema), optionChain);
+router.get("/candles", validate(candlesSchema), getCandles);
 
 export default router;

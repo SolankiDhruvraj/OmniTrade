@@ -1,69 +1,75 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createChart, ColorType, CandlestickSeries, HistogramSeries } from 'lightweight-charts'
 import { ExternalLink, Layers, LineChart, Loader2, RefreshCcw, X } from 'lucide-react'
 import { apiRequest } from '../api/client.js'
 
-// Parse Indian broker symbols to root ticker and exchange representations
 export const parseSymbolDetails = (rawSymbol) => {
-  if (!rawSymbol) return { root: 'NIFTY', isIndex: true, nseSymbol: 'NSE:NIFTY', bseSymbol: 'BSE:SENSEX' }
+  if (!rawSymbol) return { root: 'NIFTY', isIndex: true, nseSymbol: 'NSE:NIFTY' }
   let s = String(rawSymbol).trim().toUpperCase()
 
-  if (s.startsWith('BSE:')) {
-    s = s.replace('BSE:', '')
-  } else if (s.startsWith('NSE:')) {
-    s = s.replace('NSE:', '')
-  }
+  if (s.startsWith('BSE:')) s = s.replace('BSE:', '')
+  else if (s.startsWith('NSE:')) s = s.replace('NSE:', '')
 
-  // Handle common indices
-  if (s.includes('NIFTY50') || s === 'NIFTY') {
-    return { root: 'NIFTY', isIndex: true, nseSymbol: 'NSE:NIFTY', bseSymbol: 'BSE:SENSEX' }
-  }
-  if (s.includes('BANKNIFTY') || s.includes('NIFTYBANK')) {
-    return { root: 'BANKNIFTY', isIndex: true, nseSymbol: 'NSE:BANKNIFTY', bseSymbol: 'BSE:BANKEX' }
-  }
-  if (s.includes('FINNIFTY')) {
-    return { root: 'FINNIFTY', isIndex: true, nseSymbol: 'NSE:FINNIFTY', bseSymbol: 'NSE:FINNIFTY' }
-  }
-  if (s.includes('MIDCPNIFTY')) {
-    return { root: 'MIDCPNIFTY', isIndex: true, nseSymbol: 'NSE:MIDCPNIFTY', bseSymbol: 'NSE:MIDCPNIFTY' }
-  }
-  if (s.includes('SENSEX')) {
-    return { root: 'SENSEX', isIndex: true, nseSymbol: 'BSE:SENSEX', bseSymbol: 'BSE:SENSEX' }
-  }
+  if (s.includes('NIFTY50') || s === 'NIFTY') return { root: 'NIFTY', isIndex: true, nseSymbol: 'NSE:NIFTY' }
+  if (s.includes('BANKNIFTY') || s.includes('NIFTYBANK')) return { root: 'BANKNIFTY', isIndex: true, nseSymbol: 'NSE:BANKNIFTY' }
+  if (s.includes('FINNIFTY')) return { root: 'FINNIFTY', isIndex: true, nseSymbol: 'NSE:FINNIFTY' }
+  if (s.includes('MIDCPNIFTY')) return { root: 'MIDCPNIFTY', isIndex: true, nseSymbol: 'NSE:MIDCPNIFTY' }
 
-  // Strip common broker suffixes
   s = s.replace(/-EQ$/, '').replace(/-INDEX$/, '').replace(/-BE$/, '')
 
-  // Derivative match
   const derivativeMatch = s.match(/^([A-Z]+)\d{2}[A-Z]{3}/)
   if (derivativeMatch && derivativeMatch[1]) {
     s = derivativeMatch[1]
-    if (s === 'NIFTY') return { root: 'NIFTY', isIndex: true, nseSymbol: 'NSE:NIFTY', bseSymbol: 'BSE:SENSEX' }
-    if (s === 'BANKNIFTY') return { root: 'BANKNIFTY', isIndex: true, nseSymbol: 'NSE:BANKNIFTY', bseSymbol: 'BSE:BANKEX' }
+    if (s === 'NIFTY') return { root: 'NIFTY', isIndex: true, nseSymbol: 'NSE:NIFTY' }
+    if (s === 'BANKNIFTY') return { root: 'BANKNIFTY', isIndex: true, nseSymbol: 'NSE:BANKNIFTY' }
   }
 
-  return {
-    root: s,
-    isIndex: false,
-    nseSymbol: `NSE:${s}`,
-    bseSymbol: `BSE:${s}`,
-  }
+  return { root: s, isIndex: false, nseSymbol: `NSE:${s}` }
 }
 
+const timeframes = [
+  { label: '5m', res: '5' },
+  { label: '15m', res: '15' },
+  { label: '1h', res: '60' },
+  { label: '1D', res: 'D' },
+]
+
 export const StockChartModal = ({ symbol, initialTab = 'chart', onSelectContract, onClose }) => {
-  const containerRef = useRef(null)
+  const chartContainerRef = useRef(null)
+  const chartInstanceRef = useRef(null)
+  const candleSeriesRef = useRef(null)
+  const volumeSeriesRef = useRef(null)
+
   const details = useMemo(() => parseSymbolDetails(symbol), [symbol])
 
   const [activeTab, setActiveTab] = useState(initialTab) // 'chart' | 'chain'
-  const [exchange, setExchange] = useState(details.isIndex ? 'NSE' : 'BSE')
+  const [resolution, setResolution] = useState('D')
+
+  // Candle data state
+  const [candles, setCandles] = useState([])
+  const [chartLoading, setChartLoading] = useState(false)
+  const [chartError, setChartError] = useState('')
 
   // Option chain state
   const [optionChain, setOptionChain] = useState(null)
   const [chainLoading, setChainLoading] = useState(false)
   const [chainError, setChainError] = useState('')
 
-  const currentTvSymbol = exchange === 'BSE' ? details.bseSymbol : details.nseSymbol
+  // Fetch native historical candles from Fyers API
+  const fetchCandles = async (res = resolution) => {
+    setChartLoading(true)
+    setChartError('')
+    try {
+      const data = await apiRequest(`/instruments/candles?symbol=${encodeURIComponent(symbol)}&resolution=${res}&broker=fyers`)
+      setCandles(data.candles || [])
+    } catch (err) {
+      setChartError(err.message || 'Unable to load candles from Fyers')
+    } finally {
+      setChartLoading(false)
+    }
+  }
 
-  // Load option chain
+  // Fetch option chain
   const fetchOptionChain = async () => {
     setChainLoading(true)
     setChainError('')
@@ -78,45 +84,122 @@ export const StockChartModal = ({ symbol, initialTab = 'chart', onSelectContract
   }
 
   useEffect(() => {
-    if (activeTab === 'chain' && !optionChain && !chainLoading) {
+    if (activeTab === 'chart') {
+      fetchCandles(resolution)
+    } else if (activeTab === 'chain' && !optionChain && !chainLoading) {
       fetchOptionChain()
     }
-  }, [activeTab])
+  }, [activeTab, resolution, symbol])
 
-  // TradingView chart embed
+  // Initialize and render Lightweight Charts HTML5 Canvas
   useEffect(() => {
-    if (activeTab !== 'chart' || !containerRef.current) return
+    if (activeTab !== 'chart' || !chartContainerRef.current) return
 
-    containerRef.current.innerHTML = ''
-    const widgetDiv = document.createElement('div')
-    widgetDiv.className = 'tradingview-widget-container__widget'
-    widgetDiv.style.height = 'calc(100% - 32px)'
-    widgetDiv.style.width = '100%'
-    containerRef.current.appendChild(widgetDiv)
+    // Clean up old chart
+    if (chartInstanceRef.current) {
+      chartInstanceRef.current.remove()
+      chartInstanceRef.current = null
+    }
 
-    const script = document.createElement('script')
-    script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js'
-    script.type = 'text/javascript'
-    script.async = true
-    script.innerHTML = JSON.stringify({
-      autosize: true,
-      symbol: currentTvSymbol,
-      interval: 'D',
-      timezone: 'Asia/Kolkata',
-      theme: 'light',
-      style: '1',
-      locale: 'en',
-      enable_publishing: false,
-      allow_symbol_change: true,
-      calendar: false,
-      hide_top_toolbar: false,
-      hide_legend: false,
-      save_image: false,
-      support_host: 'https://www.tradingview.com',
+    const container = chartContainerRef.current
+    const chart = createChart(container, {
+      width: container.clientWidth || 900,
+      height: container.clientHeight || 500,
+      layout: {
+        background: { type: ColorType.Solid, color: '#ffffff' },
+        textColor: '#334155',
+      },
+      grid: {
+        vertLines: { color: '#f1f5f9' },
+        horzLines: { color: '#f1f5f9' },
+      },
+      crosshair: {
+        mode: 1, // Magnet mode
+      },
+      timeScale: {
+        borderColor: '#cbd5e1',
+        timeVisible: resolution !== 'D',
+        secondsVisible: false,
+      },
+      rightPriceScale: {
+        borderColor: '#cbd5e1',
+        autoScale: true,
+      },
     })
 
-    containerRef.current.appendChild(script)
-  }, [activeTab, currentTvSymbol])
+    // Candlestick series (Up is Kite Green, Down is Kite Red)
+    const candleSeries = chart.addSeries(CandlestickSeries, {
+      upColor: '#26a69a',
+      downColor: '#ef5350',
+      borderVisible: false,
+      wickUpColor: '#26a69a',
+      wickDownColor: '#ef5350',
+    })
+
+    // Volume histogram at the bottom
+    const volumeSeries = chart.addSeries(HistogramSeries, {
+      color: '#cbd5e1',
+      priceFormat: { type: 'volume' },
+      priceScaleId: '', // overlay
+    })
+    volumeSeries.priceScale().applyOptions({
+      scaleMargins: { top: 0.8, bottom: 0 },
+    })
+
+    chartInstanceRef.current = chart
+    candleSeriesRef.current = candleSeries
+    volumeSeriesRef.current = volumeSeries
+
+    // Handle responsive resizing
+    const handleResize = () => {
+      if (container && chartInstanceRef.current) {
+        chartInstanceRef.current.applyOptions({
+          width: container.clientWidth,
+          height: container.clientHeight,
+        })
+      }
+    }
+    window.addEventListener('resize', handleResize)
+
+    return () => {
+      window.removeEventListener('resize', handleResize)
+      if (chartInstanceRef.current) {
+        chartInstanceRef.current.remove()
+        chartInstanceRef.current = null
+      }
+    }
+  }, [activeTab, resolution])
+
+  // Feed candles and volume data to the canvas chart
+  useEffect(() => {
+    if (!candles.length || !candleSeriesRef.current || !chartInstanceRef.current) return
+
+    // Sort by timestamp
+    const sorted = [...candles].sort((a, b) => a.time - b.time)
+
+    // Filter duplicates
+    const unique = []
+    let lastTime = 0
+    for (const c of sorted) {
+      if (c.time > lastTime) {
+        unique.push(c)
+        lastTime = c.time
+      }
+    }
+
+    candleSeriesRef.current.setData(unique)
+
+    if (volumeSeriesRef.current) {
+      const volData = unique.map((c) => ({
+        time: c.time,
+        value: c.volume,
+        color: c.close >= c.open ? 'rgba(38, 166, 154, 0.4)' : 'rgba(239, 83, 80, 0.4)',
+      }))
+      volumeSeriesRef.current.setData(volData)
+    }
+
+    chartInstanceRef.current.timeScale().fitContent()
+  }, [candles])
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -126,7 +209,7 @@ export const StockChartModal = ({ symbol, initialTab = 'chart', onSelectContract
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [onClose])
 
-  // Parse option chain into Kite-style ladder
+  // Process Option Chain
   const chainLadder = useMemo(() => {
     const source = optionChain?.data?.optionsChain || optionChain?.data || optionChain?.optionsChain || []
     if (!Array.isArray(source) || !source.length) return { ladder: [], spotPrice: null, atmStrike: null }
@@ -168,6 +251,8 @@ export const StockChartModal = ({ symbol, initialTab = 'chart', onSelectContract
 
     return { ladder: sorted, spotPrice, atmStrike }
   }, [optionChain])
+
+  const latestCandle = candles[candles.length - 1]
 
   return (
     <div
@@ -219,8 +304,15 @@ export const StockChartModal = ({ symbol, initialTab = 'chart', onSelectContract
             gap: '8px',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-            <strong style={{ fontSize: '15px', color: '#0f172a' }}>{symbol}</strong>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <div>
+              <strong style={{ fontSize: '15px', color: '#0f172a' }}>{symbol}</strong>
+              {latestCandle && activeTab === 'chart' && (
+                <span style={{ fontSize: '12px', marginLeft: '8px', fontWeight: 600, color: latestCandle.close >= latestCandle.open ? '#26a69a' : '#ef5350' }}>
+                  ₹{latestCandle.close.toFixed(2)}
+                </span>
+              )}
+            </div>
 
             {/* View Mode Tabs: Chart vs Option Chain */}
             <div style={{ display: 'inline-flex', background: '#e2e8f0', padding: '2px', borderRadius: '5px' }}>
@@ -266,59 +358,55 @@ export const StockChartModal = ({ symbol, initialTab = 'chart', onSelectContract
               </button>
             </div>
 
-            {/* BSE / NSE Exchange switcher (visible only on Chart view) */}
-            {activeTab === 'chart' && !details.isIndex && (
+            {/* Resolution Timeframe Buttons */}
+            {activeTab === 'chart' && (
               <div style={{ display: 'inline-flex', background: '#e2e8f0', padding: '2px', borderRadius: '4px' }}>
-                <button
-                  type="button"
-                  onClick={() => setExchange('BSE')}
-                  style={{
-                    padding: '2px 7px',
-                    fontSize: '10px',
-                    fontWeight: 700,
-                    border: 'none',
-                    borderRadius: '3px',
-                    cursor: 'pointer',
-                    background: exchange === 'BSE' ? '#ffffff' : 'transparent',
-                    color: exchange === 'BSE' ? 'var(--kite-blue)' : '#64748b',
-                    boxShadow: exchange === 'BSE' ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
-                  }}
-                  title="BSE feed"
-                >
-                  BSE
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setExchange('NSE')}
-                  style={{
-                    padding: '2px 7px',
-                    fontSize: '10px',
-                    fontWeight: 700,
-                    border: 'none',
-                    borderRadius: '3px',
-                    cursor: 'pointer',
-                    background: exchange === 'NSE' ? '#ffffff' : 'transparent',
-                    color: exchange === 'NSE' ? 'var(--kite-blue)' : '#64748b',
-                    boxShadow: exchange === 'NSE' ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
-                  }}
-                  title="NSE feed"
-                >
-                  NSE
-                </button>
+                {timeframes.map((tf) => (
+                  <button
+                    key={tf.res}
+                    type="button"
+                    onClick={() => setResolution(tf.res)}
+                    style={{
+                      padding: '2px 7px',
+                      fontSize: '10px',
+                      fontWeight: 700,
+                      border: 'none',
+                      borderRadius: '3px',
+                      cursor: 'pointer',
+                      background: resolution === tf.res ? '#ffffff' : 'transparent',
+                      color: resolution === tf.res ? 'var(--kite-blue)' : '#64748b',
+                      boxShadow: resolution === tf.res ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
+                    }}
+                  >
+                    {tf.label}
+                  </button>
+                ))}
               </div>
             )}
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <button
+              className="ghost-button"
+              onClick={() => {
+                if (activeTab === 'chart') fetchCandles(resolution)
+                else fetchOptionChain()
+              }}
+              style={{ padding: '4px 8px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}
+              title="Refresh chart data"
+              type="button"
+            >
+              <RefreshCcw size={12} className={chartLoading || chainLoading ? 'spinning' : ''} />
+            </button>
             <a
               href={`https://in.tradingview.com/chart/?symbol=${encodeURIComponent(details.nseSymbol)}`}
               target="_blank"
               rel="noopener noreferrer"
               className="ghost-button"
               style={{ padding: '4px 8px', fontSize: '11px', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}
-              title="Open full interactive NSE chart on TradingView"
+              title="Open on TradingView.com"
             >
-              <ExternalLink size={14} /> <span className="external-link-text">TradingView</span>
+              <ExternalLink size={13} /> <span className="external-link-text">TradingView</span>
             </a>
             <button
               type="button"
@@ -335,11 +423,43 @@ export const StockChartModal = ({ symbol, initialTab = 'chart', onSelectContract
         {/* Modal Body */}
         <div style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden' }}>
           {activeTab === 'chart' ? (
-            <div
-              className="tradingview-widget-container"
-              ref={containerRef}
-              style={{ height: '100%', width: '100%' }}
-            />
+            <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+              {chartLoading && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    background: 'rgba(255, 255, 255, 0.7)',
+                    zIndex: 10,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    fontSize: '13px',
+                    color: '#475569',
+                  }}
+                >
+                  <Loader2 className="spinning" size={20} color="var(--kite-blue)" />
+                  Loading Fyers live candles...
+                </div>
+              )}
+
+              {chartError && (
+                <div style={{ padding: '40px', textAlign: 'center' }}>
+                  <div className="alert error" style={{ maxWidth: '500px', margin: '0 auto 12px' }}>
+                    {chartError}
+                  </div>
+                  <button className="secondary-button" onClick={() => fetchCandles(resolution)} type="button">
+                    <RefreshCcw size={14} /> Retry
+                  </button>
+                </div>
+              )}
+
+              <div
+                ref={chartContainerRef}
+                style={{ width: '100%', height: '100%' }}
+              />
+            </div>
           ) : (
             <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#f8fafc' }}>
               {chainLoading ? (

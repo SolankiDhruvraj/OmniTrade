@@ -15,6 +15,17 @@ export const searchSchema = z.object({
   }),
 });
 
+export const candlesSchema = z.object({
+  query: z.object({
+    symbol: z.string().min(1),
+    resolution: z.string().default("D"),
+    rangeFrom: z.string().optional(),
+    rangeTo: z.string().optional(),
+    broker: z.string().default("fyers"),
+    accountId: z.string().optional(),
+  }),
+});
+
 export const optionChainSchema = z.object({
   query: z.object({
     broker: z.string().default("fyers"),
@@ -84,6 +95,79 @@ export const search = asyncHandler(async (req, res) => {
     query: req.validated.query.q,
   });
   res.json(result);
+});
+
+export const getCandles = asyncHandler(async (req, res) => {
+  const { symbol, resolution, rangeFrom, rangeTo, broker, accountId } = req.validated.query;
+  let account = null;
+
+  if (accountId) {
+    account = await BrokerAccount.findOne({
+      _id: accountId,
+      user: req.user._id,
+      broker,
+      isActive: true,
+    });
+  } else {
+    account = await BrokerAccount.findOne({
+      user: req.user._id,
+      broker,
+      isActive: true,
+    });
+  }
+
+  if (!account) {
+    throw new AppError("No active linked Fyers account found to fetch historical candles", 404);
+  }
+
+  const adapter = BrokerFactory.getBroker(broker);
+  const resolvedSymbol = broker === "fyers"
+    ? await resolveFyersOptionChainSymbol(symbol)
+    : symbol;
+
+  // Calculate default range if not passed (e.g. last 180 days for D, or 10 days for minute resolutions)
+  const toDate = new Date();
+  const fromDate = new Date();
+  if (resolution === "D") {
+    fromDate.setDate(toDate.getDate() - 200);
+  } else {
+    fromDate.setDate(toDate.getDate() - 15);
+  }
+
+  const formatDate = (d) => d.toISOString().split("T")[0];
+  const rFrom = rangeFrom || formatDate(fromDate);
+  const rTo = rangeTo || formatDate(toDate);
+
+  const historyParams = {
+    symbol: resolvedSymbol,
+    resolution,
+    date_format: "1",
+    range_from: rFrom,
+    range_to: rTo,
+    cont_flag: "1",
+  };
+
+  const historyResponse = await adapter.getHistory(getBrokerAccessToken(account), historyParams);
+  if (historyResponse?.s && historyResponse.s !== "ok") {
+    throw new AppError(historyResponse.message || "Fyers failed to return historical candle data", 502, historyResponse);
+  }
+
+  // Fyers candles format: [epoch_timestamp, open, high, low, close, volume]
+  const rawCandles = historyResponse?.candles || [];
+  const candles = rawCandles.map((c) => ({
+    time: c[0], // epoch in seconds
+    open: Number(c[1]),
+    high: Number(c[2]),
+    low: Number(c[3]),
+    close: Number(c[4]),
+    volume: Number(c[5] || 0),
+  }));
+
+  res.json({
+    symbol: resolvedSymbol,
+    resolution,
+    candles,
+  });
 });
 
 export const optionChain = asyncHandler(async (req, res) => {

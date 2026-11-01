@@ -136,6 +136,10 @@ export class FyersBrokerAdapter {
     return this.createClient(credentialsData).getOptionChain(params);
   }
 
+  async getHistory(credentialsData, params) {
+    return this.createClient(credentialsData).getHistory(params);
+  }
+
   async placeOrder(credentialsData, order) {
     return this.createClient(credentialsData).place_order(order);
   }
