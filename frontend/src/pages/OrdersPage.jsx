@@ -119,8 +119,8 @@ export const OrdersPage = () => {
           <h1>Orders</h1>
           <p>Live exchange order book across connected brokers and batch execution history.</p>
         </div>
-        <button className="secondary-button" disabled={loading} onClick={() => loadOrders(pagination.page)} type="button">
-          <RefreshCcw className={loading ? 'spinning' : ''} size={16} /> Refresh
+        <button className="secondary-button" disabled={loading} onClick={() => loadOrders(pagination.page)} title="Refresh orders" type="button">
+          <RefreshCcw className={loading ? 'spinning' : ''} size={16} />
         </button>
       </div>
 

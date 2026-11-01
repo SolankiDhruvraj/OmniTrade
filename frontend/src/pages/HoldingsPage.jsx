@@ -82,8 +82,8 @@ export const HoldingsPage = () => {
           <p>Real-time equity portfolio and demat holdings for each connected broker account.</p>
         </div>
         <div className="toolbar">
-          <button className="secondary-button" disabled={loading} onClick={loadHoldings} type="button">
-            <RefreshCcw className={loading ? 'spinning' : ''} size={16} /> Refresh
+          <button className="secondary-button" disabled={loading} onClick={loadHoldings} title="Refresh holdings" type="button">
+            <RefreshCcw className={loading ? 'spinning' : ''} size={16} />
           </button>
         </div>
       </div>

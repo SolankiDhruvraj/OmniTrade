@@ -264,8 +264,8 @@ export const AccountsPage = () => {
           </p>
         </div>
         <div className="toolbar">
-          <button className="secondary-button" disabled={loading} onClick={loadAccounts} type="button">
-            <RefreshCcw className={loading ? 'spinning' : ''} size={16} /> Refresh
+          <button className="secondary-button" disabled={loading} onClick={loadAccounts} title="Refresh accounts" type="button">
+            <RefreshCcw className={loading ? 'spinning' : ''} size={16} />
           </button>
           <Link className="secondary-button" to="/accounts/add"><Plus size={16} /> Add manual account</Link>
           <button

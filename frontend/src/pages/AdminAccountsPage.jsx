@@ -62,8 +62,8 @@ export const AdminAccountsPage = () => {
           <p>Supervise all broker connections across the system and revoke access if necessary.</p>
         </div>
         <div className="toolbar">
-          <button className="secondary-button" disabled={loading} onClick={loadAccounts} type="button">
-            <RefreshCcw size={16} /> Refresh
+          <button className="secondary-button" disabled={loading} onClick={loadAccounts} title="Refresh accounts" type="button">
+            <RefreshCcw size={16} />
           </button>
         </div>
       </div>

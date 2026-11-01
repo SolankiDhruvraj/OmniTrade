@@ -68,8 +68,8 @@ export const AdminTransactionsPage = () => {
           <p>Global audit log of all order executions and simultaneous broker attempts across all users.</p>
         </div>
         <div className="toolbar">
-          <button className="secondary-button" disabled={loading} onClick={() => loadAllOrders(pagination.page, appliedSearch)} type="button">
-            <RefreshCcw className={loading ? 'spinning' : ''} size={16} /> Refresh
+          <button className="secondary-button" disabled={loading} onClick={() => loadAllOrders(pagination.page, appliedSearch)} title="Refresh transactions" type="button">
+            <RefreshCcw className={loading ? 'spinning' : ''} size={16} />
           </button>
         </div>
       </div>

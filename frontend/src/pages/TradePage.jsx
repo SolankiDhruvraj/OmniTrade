@@ -83,6 +83,58 @@ export const TradePage = () => {
   )
 
   const chainRows = useMemo(() => getChainRows(optionChain), [optionChain])
+
+  // Process option chain into Kite-style Strike ladder: Calls on left, Strike in center, Puts on right
+  const kiteChainLadder = useMemo(() => {
+    if (!chainRows || !chainRows.length) return []
+
+    const strikesMap = new Map()
+    let spotPrice = null
+
+    for (const row of chainRows) {
+      const strike = Number(row.strike_price ?? row.strike)
+      const optType = String(row.option_type || row.optionType || row.type || '').toUpperCase()
+
+      // The first entry or strike -1 is often the underlying future/spot
+      if (strike === -1 || !optType) {
+        if (row.ltp || row.fp || row.last_price) {
+          spotPrice = Number(row.ltp || row.fp || row.last_price)
+        }
+        continue
+      }
+
+      if (!strikesMap.has(strike)) {
+        strikesMap.set(strike, { strike, call: null, put: null })
+      }
+      const strikeObj = strikesMap.get(strike)
+
+      if (optType === 'CE' || optType === 'CALL') {
+        strikeObj.call = row
+      } else if (optType === 'PE' || optType === 'PUT') {
+        strikeObj.put = row
+      }
+    }
+
+    const sorted = Array.from(strikesMap.values()).sort((a, b) => a.strike - b.strike)
+
+    // Detect At-The-Money (ATM) strike closest to spot price (or middle strike if spot not found)
+    let atmStrike = null
+    if (spotPrice && sorted.length > 0) {
+      let minDiff = Infinity
+      for (const item of sorted) {
+        const diff = Math.abs(item.strike - spotPrice)
+        if (diff < minDiff) {
+          minDiff = diff
+          atmStrike = item.strike
+        }
+      }
+    } else if (sorted.length > 0) {
+      atmStrike = sorted[Math.floor(sorted.length / 2)].strike
+    }
+
+    return { ladder: sorted, spotPrice, atmStrike }
+  }, [chainRows])
+
   const activeOrders = basket.length > 0 ? basket : order.symbol ? [order] : []
 
   const loadAccounts = async () => {
@@ -397,7 +449,7 @@ export const TradePage = () => {
         <div className="panel">
           <div className="section-title">
             <h2>Linked accounts</h2>
-            <button className="ghost-button" onClick={loadAccounts} type="button"><RefreshCcw size={14} /> Refresh</button>
+            <button className="ghost-button" onClick={loadAccounts} title="Refresh accounts" type="button"><RefreshCcw size={14} /></button>
           </div>
           {accounts.length === 0 ? (
             <div className="empty-state compact">Connect a Fyers or Zerodha account from the Accounts page.</div>
@@ -434,37 +486,32 @@ export const TradePage = () => {
                       style={{
                         paddingTop: 8,
                         marginTop: 4,
-                        borderTop: '1px solid #f0f0f0',
+                        borderTop: '1px solid #edf2f7',
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center',
+                        gap: 8,
                         fontSize: 12,
                       }}
                     >
-                      <div style={{ color: '#555' }}>
-                        <span style={{ color: '#888' }}>Margin: </span>
-                        <strong>
+                      <div style={{ color: '#475569', display: 'flex', alignItems: 'center', gap: 4, minWidth: 0, overflow: 'hidden' }}>
+                        <span style={{ color: '#94a3b8', fontSize: 11 }}>Margin:</span>
+                        <strong style={{ fontSize: 12, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {funds ? `₹${Math.round(funds.availableMargin || funds.availableCash || 0).toLocaleString('en-IN')}` : (loadingFunds ? '...' : '—')}
                         </strong>
                       </div>
 
                       {isSelected && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <span style={{ color: '#888', fontSize: 11 }}>Multiplier:</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                          <span style={{ color: '#94a3b8', fontSize: 11, fontWeight: 500 }}>Multiplier:</span>
                           <select
+                            className="multiplier-select"
                             value={multiplier}
                             onChange={(e) => {
                               const val = Number(e.target.value) || 1
                               setAccountMultipliers((prev) => ({ ...prev, [account.id]: val }))
                             }}
-                            style={{
-                              padding: '2px 6px',
-                              fontSize: 12,
-                              fontWeight: 600,
-                              borderRadius: 4,
-                              border: '1px solid #ccc',
-                              background: '#fff',
-                            }}
+                            title="Multiplier"
                           >
                             <option value={1}>1×</option>
                             <option value={2}>2×</option>
@@ -484,20 +531,126 @@ export const TradePage = () => {
         </div>
 
         {optionChain && (
-          <div className="panel option-chain">
-            <div className="section-title">
-              <h2>Option chain</h2>
-              <span className="badge">{chainRows.length || 'Raw'} rows</span>
+          <div className="panel option-chain" style={{ padding: '12px' }}>
+            <div className="section-title" style={{ marginBottom: '8px' }}>
+              <div>
+                <h2 style={{ fontSize: '15px' }}>Option chain (Kite view)</h2>
+                {kiteChainLadder?.spotPrice && (
+                  <span style={{ fontSize: '12px', color: '#64748b', marginLeft: '8px' }}>
+                    Spot: <strong>₹{kiteChainLadder.spotPrice.toLocaleString('en-IN')}</strong>
+                  </span>
+                )}
+              </div>
+              <span className="badge">{kiteChainLadder?.ladder?.length || chainRows.length || 'Raw'} strikes</span>
             </div>
-            {chainRows.length > 0 ? (
-              <div className="chain-grid">
-                {chainRows.slice(0, 80).map((row, index) => (
-                  <button className="chain-row" key={`${getChainSymbol(row)}-${index}`} onClick={() => selectChainRow(row)} type="button">
-                    <strong>{getChainSymbol(row) || row.strike_price || row.strike || 'Contract'}</strong>
-                    <span>{row.option_type || row.optionType || row.type || ''}</span>
-                    <span>{row.ltp || row.last_price || row.price || ''}</span>
-                  </button>
-                ))}
+
+            {kiteChainLadder?.ladder?.length > 0 ? (
+              <div className="kite-option-chain-container">
+                <div className="kite-chain-scroll">
+                  <table className="kite-chain-table">
+                    <thead>
+                      <tr>
+                        <th colSpan={3} className="side-calls">CALLS (CE)</th>
+                        <th className="strike-header">STRIKE</th>
+                        <th colSpan={3} className="side-puts">PUTS (PE)</th>
+                      </tr>
+                      <tr>
+                        <th style={{ textAlign: 'right' }}>OI</th>
+                        <th style={{ textAlign: 'right' }}>Chg%</th>
+                        <th style={{ textAlign: 'right', borderRight: '1px solid #cbd5e1' }}>LTP</th>
+                        <th style={{ textAlign: 'center', background: '#e2e8f0', color: '#0f172a' }}>Strike</th>
+                        <th style={{ textAlign: 'left', borderLeft: '1px solid #cbd5e1' }}>LTP</th>
+                        <th style={{ textAlign: 'left' }}>Chg%</th>
+                        <th style={{ textAlign: 'left' }}>OI</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {kiteChainLadder.ladder.map(({ strike, call, put }) => {
+                        const isAtm = strike === kiteChainLadder.atmStrike
+
+                        const callLtp = call?.ltp ?? call?.last_price ?? call?.price
+                        const callChg = call?.chp ?? call?.change_percent ?? call?.ch
+                        const callOi = call?.oi ?? call?.open_interest
+
+                        const putLtp = put?.ltp ?? put?.last_price ?? put?.price
+                        const putChg = put?.chp ?? put?.change_percent ?? put?.ch
+                        const putOi = put?.oi ?? put?.open_interest
+
+                        return (
+                          <tr key={`strike-${strike}`} className={isAtm ? 'atm-row' : ''}>
+                            {/* CALLS SIDE */}
+                            <td>{callOi ? Number(callOi).toLocaleString('en-IN') : '—'}</td>
+                            <td className={callChg > 0 ? 'positive-value' : callChg < 0 ? 'negative-value' : ''}>
+                              {callChg !== undefined && callChg !== null ? `${Number(callChg).toFixed(2)}%` : '—'}
+                            </td>
+                            <td
+                              className={`calls-ltp ${call ? 'clickable-cell' : ''}`}
+                              onClick={() => call && selectChainRow(call)}
+                              title={call ? `Click to trade ${getChainSymbol(call)} (Call)` : ''}
+                            >
+                              {callLtp !== undefined && callLtp !== null ? `₹${callLtp}` : '—'}
+                            </td>
+
+                            {/* CENTER STRIKE */}
+                            <td className="strike-cell">
+                              {strike.toLocaleString('en-IN')}
+                              {isAtm && <span style={{ display: 'block', fontSize: '9px', fontWeight: 800, color: '#a16207' }}>ATM</span>}
+                            </td>
+
+                            {/* PUTS SIDE */}
+                            <td
+                              className={`puts-ltp ${put ? 'clickable-cell' : ''}`}
+                              onClick={() => put && selectChainRow(put)}
+                              title={put ? `Click to trade ${getChainSymbol(put)} (Put)` : ''}
+                            >
+                              {putLtp !== undefined && putLtp !== null ? `₹${putLtp}` : '—'}
+                            </td>
+                            <td className={`puts-cell ${putChg > 0 ? 'positive-value' : putChg < 0 ? 'negative-value' : ''}`}>
+                              {putChg !== undefined && putChg !== null ? `${Number(putChg).toFixed(2)}%` : '—'}
+                            </td>
+                            <td className="puts-cell">{putOi ? Number(putOi).toLocaleString('en-IN') : '—'}</td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="kite-chain-footer">
+                  <div>
+                    Click on any <strong>Call LTP</strong> or <strong>Put LTP</strong> to immediately load that contract into the order leg.
+                  </div>
+                  {kiteChainLadder?.atmStrike && (
+                    <div>
+                      ATM Strike: <strong>{kiteChainLadder.atmStrike}</strong>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : chainRows.length > 0 ? (
+              <div className="kite-option-chain-container">
+                <div className="kite-chain-scroll">
+                  <table className="kite-chain-table">
+                    <thead>
+                      <tr>
+                        <th style={{ textAlign: 'left' }}>Contract</th>
+                        <th style={{ textAlign: 'center' }}>Type</th>
+                        <th style={{ textAlign: 'right' }}>Strike</th>
+                        <th style={{ textAlign: 'right' }}>LTP</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {chainRows.slice(0, 100).map((row, idx) => (
+                        <tr key={idx} onClick={() => selectChainRow(row)} className="clickable-cell">
+                          <td style={{ textAlign: 'left', fontWeight: 600 }}>{getChainSymbol(row)}</td>
+                          <td style={{ textAlign: 'center' }}>{row.option_type || row.type || '—'}</td>
+                          <td style={{ textAlign: 'right' }}>{row.strike_price || '—'}</td>
+                          <td style={{ textAlign: 'right', fontWeight: 600, color: 'var(--kite-blue)' }}>₹{row.ltp || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             ) : (
               <pre>{JSON.stringify(optionChain?.data || optionChain, null, 2)}</pre>

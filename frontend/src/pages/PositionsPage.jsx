@@ -126,8 +126,8 @@ export const PositionsPage = () => {
           <p>Live open positions by Fyers account.</p>
         </div>
         <div className="toolbar">
-          <button className="secondary-button" disabled={loading || exiting} onClick={loadPositions} type="button">
-            <RefreshCcw className={loading ? 'spinning' : ''} size={16} /> Refresh
+          <button className="secondary-button" disabled={loading || exiting} onClick={loadPositions} title="Refresh positions" type="button">
+            <RefreshCcw className={loading ? 'spinning' : ''} size={16} />
           </button>
           <button className="danger-button" disabled={!selected.length || exiting} onClick={exitSelected} type="button">
             {exiting ? <Loader2 className="spinning" size={16} /> : <X size={16} />}
@@ -179,63 +179,142 @@ export const PositionsPage = () => {
             <span>Fyers accounts with open positions will appear here.</span>
           </div>
         ) : (
-          <table>
-            <thead>
-              <tr>
-                <th style={{ width: '40px' }}>Select</th>
-                <th>Account</th>
-                <th>Symbol</th>
-                <th>Net quantity</th>
-                <th>Average</th>
-                <th>Unrealized P&amp;L</th>
-                <th>Product</th>
-                <th style={{ textAlign: 'right' }}>Action</th>
-              </tr>
-            </thead>
-            <tbody>
+          <>
+            <table className="desktop-positions-table">
+              <thead>
+                <tr>
+                  <th style={{ width: '40px' }}>Select</th>
+                  <th>Account</th>
+                  <th>Symbol</th>
+                  <th>Net quantity</th>
+                  <th>Average</th>
+                  <th>Unrealized P&amp;L</th>
+                  <th>Product</th>
+                  <th style={{ textAlign: 'right' }}>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {accounts.flatMap((account) => account.positions.map((position) => {
+                  const item = { brokerAccountId: account.brokerAccountId, positionId: position.id }
+                  const isSelected = selected.some((selectedItem) => selectionKey(selectedItem) === selectionKey(item))
+                  const canExit = Boolean(position.id) && (account.broker === 'fyers' || account.broker === 'zerodha')
+
+                  return (
+                    <tr key={selectionKey(item)}>
+                      <td>
+                        <input
+                          aria-label={`Select ${position.symbol} in ${account.displayName} for exit`}
+                          checked={isSelected}
+                          disabled={!canExit}
+                          onChange={() => togglePosition(account.brokerAccountId, position.id)}
+                          type="checkbox"
+                        />
+                      </td>
+                      <td>{account.displayName}</td>
+                      <td><strong>{position.symbol}</strong></td>
+                      <td>{position.netQty}</td>
+                      <td>{formatMoney(position.netAvg)}</td>
+                      <td className={position.unrealizedProfit < 0 ? 'negative-value' : 'positive-value'}>{formatMoney(position.unrealizedProfit)}</td>
+                      <td>{position.productType}</td>
+                      <td style={{ textAlign: 'right' }}>
+                        <button
+                          type="button"
+                          className="danger-button"
+                          disabled={exiting || !canExit}
+                          onClick={() => exitSinglePosition(account.brokerAccountId, position)}
+                          style={{
+                            padding: '4px 10px',
+                            fontSize: '12px',
+                            borderRadius: '3px',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {position.netQty > 0 ? 'Sell / Exit' : 'Exit / Cover'}
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                }))}
+              </tbody>
+            </table>
+
+            {/* Mobile Responsive Cards */}
+            <div className="mobile-positions-cards">
               {accounts.flatMap((account) => account.positions.map((position) => {
                 const item = { brokerAccountId: account.brokerAccountId, positionId: position.id }
                 const isSelected = selected.some((selectedItem) => selectionKey(selectedItem) === selectionKey(item))
                 const canExit = Boolean(position.id) && (account.broker === 'fyers' || account.broker === 'zerodha')
 
                 return (
-                  <tr key={selectionKey(item)}>
-                    <td>
-                      <input
-                        aria-label={`Select ${position.symbol} in ${account.displayName} for exit`}
-                        checked={isSelected}
-                        disabled={!canExit}
-                        onChange={() => togglePosition(account.brokerAccountId, position.id)}
-                        type="checkbox"
-                      />
-                    </td>
-                    <td>{account.displayName}</td>
-                    <td><strong>{position.symbol}</strong></td>
-                    <td>{position.netQty}</td>
-                    <td>{formatMoney(position.netAvg)}</td>
-                    <td className={position.unrealizedProfit < 0 ? 'negative-value' : 'positive-value'}>{formatMoney(position.unrealizedProfit)}</td>
-                    <td>{position.productType}</td>
-                    <td style={{ textAlign: 'right' }}>
+                  <div
+                    className={`position-card-mobile ${isSelected ? 'selected' : ''}`}
+                    key={`mobile-${selectionKey(item)}`}
+                  >
+                    <div className="card-top">
+                      <div className="card-top-left">
+                        <input
+                          aria-label={`Select ${position.symbol} in ${account.displayName} for exit`}
+                          checked={isSelected}
+                          disabled={!canExit}
+                          onChange={() => togglePosition(account.brokerAccountId, position.id)}
+                          type="checkbox"
+                        />
+                        <div>
+                          <strong style={{ fontSize: '14px', color: 'var(--ink-heading)', display: 'block', wordBreak: 'break-all' }}>
+                            {position.symbol}
+                          </strong>
+                          <span style={{ fontSize: '11px', color: '#64748b' }}>
+                            {account.displayName} &bull; {position.productType}
+                          </span>
+                        </div>
+                      </div>
+                      <span className={`status ${position.unrealizedProfit < 0 ? 'failed' : 'success'}`} style={{ fontSize: '11px', fontWeight: 600 }}>
+                        {formatMoney(position.unrealizedProfit)}
+                      </span>
+                    </div>
+
+                    <div className="card-meta">
+                      <div>
+                        <small>Net Qty</small>
+                        <span>{position.netQty}</span>
+                      </div>
+                      <div>
+                        <small>Avg Price</small>
+                        <span>{formatMoney(position.netAvg)}</span>
+                      </div>
+                      <div>
+                        <small>P&amp;L</small>
+                        <span className={position.unrealizedProfit < 0 ? 'negative-value' : 'positive-value'}>
+                          {formatMoney(position.unrealizedProfit)}
+                        </span>
+                      </div>
+                      <div>
+                        <small>Product</small>
+                        <span>{position.productType}</span>
+                      </div>
+                    </div>
+
+                    <div className="card-actions">
                       <button
                         type="button"
                         className="danger-button"
                         disabled={exiting || !canExit}
                         onClick={() => exitSinglePosition(account.brokerAccountId, position)}
                         style={{
-                          padding: '4px 10px',
+                          width: '100%',
+                          padding: '6px 12px',
                           fontSize: '12px',
-                          borderRadius: '3px',
-                          whiteSpace: 'nowrap',
+                          borderRadius: '4px',
                         }}
                       >
                         {position.netQty > 0 ? 'Sell / Exit' : 'Exit / Cover'}
                       </button>
-                    </td>
-                  </tr>
+                    </div>
+                  </div>
                 )
               }))}
-            </tbody>
-          </table>
+            </div>
+          </>
         )}
         {!loading && accounts.some((account) => account.error) && (
           <div className="position-errors">
