@@ -904,19 +904,20 @@ input[type="checkbox"] {
 
 .account-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
 }
 
 .account-card {
   min-width: 0;
   display: flex;
+  flex-direction: column;
   justify-content: space-between;
-  gap: 12px;
-  padding: 10px;
+  gap: 14px;
+  padding: 14px 16px;
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 3px;
+  border-radius: 4px;
   transition: border-color 140ms ease, box-shadow 140ms ease;
 }
 
@@ -925,17 +926,35 @@ input[type="checkbox"] {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
-.account-card > div {
+.account-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.account-card-body {
   min-width: 0;
-  display: grid;
-  align-content: start;
+  display: flex;
+  flex-direction: column;
   gap: 4px;
+}
+
+.account-card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid #f1f5f9;
+  margin-top: auto;
 }
 
 .account-card h3 {
   font-size: 14px;
   font-weight: 500;
   color: var(--ink-heading);
+  margin: 0;
 }
 
 .account-card p,
@@ -1441,6 +1460,21 @@ tbody tr:hover {
 
   .recovery-codes {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .account-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .account-card {
+    padding: 12px 14px;
+    gap: 12px;
+  }
+
+  .account-card-actions button {
+    font-size: 13px;
+    padding: 8px 12px;
   }
 
   .security-state {

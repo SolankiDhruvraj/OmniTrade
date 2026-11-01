@@ -306,31 +306,33 @@ export const AccountsPage = () => {
           <div className="account-grid">
             {accounts.map((account) => (
               <article className="account-card" key={account.id}>
-                <div>
+                <div className="account-card-header">
                   <span className="badge">{account.broker}</span>
+                  <button className="icon-button danger" onClick={() => removeAccount(account.id)} title="Remove account" type="button">
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+                <div className="account-card-body">
                   <h3>{account.displayName}</h3>
                   <p>{account.accountId}</p>
                   {account.profile?.credentialFields?.length > 0 && (
                     <small>{account.profile.credentialFields.join(', ')}</small>
                   )}
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div className="account-card-actions">
                   <button
                     className="secondary-button"
                     disabled={reconnectingId === account.id}
                     onClick={() => reconnectAccount(account)}
-                    style={{ padding: '6px 12px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                    style={{ width: '100%', justifyContent: 'center', padding: '7px 12px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}
                     title="Refresh login token for today"
                     type="button"
                   >
                     {reconnectingId === account.id ? (
                       <><Loader2 className="spinning" size={14} /> Connecting...</>
                     ) : (
-                      <><LogIn size={14} color="var(--kite-blue)" /> Re-connect</>
+                      <><LogIn size={14} color="var(--kite-blue)" /> Re-connect Account</>
                     )}
-                  </button>
-                  <button className="icon-button danger" onClick={() => removeAccount(account.id)} title="Remove account" type="button">
-                    <Trash2 size={17} />
                   </button>
                 </div>
               </article>
