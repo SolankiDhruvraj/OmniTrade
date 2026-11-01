@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CheckCircle2, Loader2, Plus, RefreshCcw, Search, Send, ShieldAlert, Trash2, X } from 'lucide-react'
+import { BarChart2, CheckCircle2, Loader2, Plus, RefreshCcw, Search, Send, ShieldAlert, Trash2, X } from 'lucide-react'
 import { apiRequest } from '../api/client.js'
 import { CustomSelect } from '../components/CustomSelect.jsx'
+import { StockChartModal } from '../components/StockChartModal.jsx'
 
 const sideOptions = [
   { value: 1, label: 'Buy' },
@@ -74,6 +75,8 @@ export const TradePage = () => {
   const [preview, setPreview] = useState(null)
   const [result, setResult] = useState(null)
   const [optionChain, setOptionChain] = useState(null)
+  const [selectedChartSymbol, setSelectedChartSymbol] = useState(null)
+  const [modalInitialTab, setModalInitialTab] = useState('chart')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -248,21 +251,14 @@ export const TradePage = () => {
   }
 
   const loadOptionChain = async () => {
-    const accountId = selectedAccounts[0]
-    if (!accountId || !order.symbol) {
-      setError('Select one linked account and a symbol before loading option chain')
+    if (!order.symbol) {
+      setError('Enter or select a symbol in the order leg to view its Option Chain')
       return
     }
-    setLoading(true)
+    // Open the Option Chain modal directly for this symbol
+    setModalInitialTab('chain')
+    setSelectedChartSymbol(order.symbol)
     setError('')
-    try {
-      const data = await apiRequest(`/instruments/option-chain?broker=fyers&accountId=${accountId}&symbol=${encodeURIComponent(order.symbol)}`)
-      setOptionChain(data.chain)
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setLoading(false)
-    }
   }
 
   const updateOrder = (field, value) => {
@@ -418,14 +414,35 @@ export const TradePage = () => {
               </div>
             )}
             {!loading && instruments.map((instrument) => (
-              <button className={order.symbol === instrument.symbol ? 'instrument-row selected' : 'instrument-row'} key={instrument._id} onClick={() => selectInstrument(instrument)} type="button">
-                <span>
-                  <strong>{instrument.symbol}</strong>
-                  <small>{instrument.name || instrument.underlying}</small>
-                </span>
+              <div
+                className={order.symbol === instrument.symbol ? 'instrument-row selected' : 'instrument-row'}
+                key={instrument._id}
+                style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto auto auto', alignItems: 'center', gap: '8px', padding: '8px 12px' }}
+              >
+                <div
+                  onClick={() => selectInstrument(instrument)}
+                  style={{ cursor: 'pointer', minWidth: 0, overflow: 'hidden' }}
+                >
+                  <strong style={{ display: 'block', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                    {instrument.symbol}
+                  </strong>
+                  <small style={{ color: 'var(--muted)' }}>{instrument.name || instrument.underlying}</small>
+                </div>
                 <span>{instrument.optionType || instrument.instrumentType || 'FUT'}</span>
                 <span>{instrument.lotSize ? `Lot ${instrument.lotSize}` : ''}</span>
-              </button>
+                <button
+                  type="button"
+                  className="ghost-button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setSelectedChartSymbol(instrument.symbol)
+                  }}
+                  style={{ padding: '4px 8px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px', minHeight: 'auto' }}
+                  title="View chart"
+                >
+                  <BarChart2 size={13} color="var(--kite-blue)" /> Chart
+                </button>
+              </div>
             ))}
             {!loading && searchMeta && instruments.length === 0 && (
               <div className="empty-state compact">
@@ -495,9 +512,9 @@ export const TradePage = () => {
                       }}
                     >
                       <div style={{ color: '#475569', display: 'flex', alignItems: 'center', gap: 4, minWidth: 0, overflow: 'hidden' }}>
-                        <span style={{ color: '#94a3b8', fontSize: 11 }}>Margin:</span>
+                        <span style={{ color: '#94a3b8', fontSize: 11 }}>Funds:</span>
                         <strong style={{ fontSize: 12, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {funds ? `₹${Math.round(funds.availableMargin || funds.availableCash || 0).toLocaleString('en-IN')}` : (loadingFunds ? '...' : '—')}
+                          {funds ? `₹${Math.round(funds.availableCash || funds.availableMargin || 0).toLocaleString('en-IN')}` : (loadingFunds ? '...' : '—')}
                         </strong>
                       </div>
 
@@ -534,7 +551,7 @@ export const TradePage = () => {
           <div className="panel option-chain" style={{ padding: '12px' }}>
             <div className="section-title" style={{ marginBottom: '8px' }}>
               <div>
-                <h2 style={{ fontSize: '15px' }}>Option chain (Kite view)</h2>
+                <h2 style={{ fontSize: '15px' }}>Option chain</h2>
                 {kiteChainLadder?.spotPrice && (
                   <span style={{ fontSize: '12px', color: '#64748b', marginLeft: '8px' }}>
                     Spot: <strong>₹{kiteChainLadder.spotPrice.toLocaleString('en-IN')}</strong>
@@ -722,6 +739,17 @@ export const TradePage = () => {
             <button className="secondary-button full" onClick={addLeg} type="button"><Plus size={16} /> Add leg</button>
           </div>
 
+          {order.symbol && (
+            <button
+              className="ghost-button full"
+              onClick={() => setSelectedChartSymbol(order.symbol)}
+              type="button"
+              style={{ justifyContent: 'center', color: 'var(--kite-blue)', fontWeight: 600, fontSize: '12px' }}
+            >
+              <BarChart2 size={15} /> View {order.symbol} chart
+            </button>
+          )}
+
           <button className="primary-button full" disabled={selectedAccounts.length === 0 || activeOrders.length === 0} type="submit">
             <ShieldAlert size={16} /> Preview basket
           </button>
@@ -780,6 +808,21 @@ export const TradePage = () => {
           </div>
         )}
       </aside>
+
+      {selectedChartSymbol && (
+        <StockChartModal
+          symbol={selectedChartSymbol}
+          initialTab={modalInitialTab}
+          onSelectContract={(contract) => {
+            selectChainRow(contract)
+            setSelectedChartSymbol(null)
+          }}
+          onClose={() => {
+            setSelectedChartSymbol(null)
+            setModalInitialTab('chart')
+          }}
+        />
+      )}
     </section>
   )
 }

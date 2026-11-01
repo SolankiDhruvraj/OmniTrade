@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowDownRight, ArrowUpRight, Briefcase, ChevronRight, Layers, Loader2, RefreshCcw, Search, Wallet } from 'lucide-react'
+import { ArrowDownRight, ArrowUpRight, BarChart2, Briefcase, ChevronRight, Layers, Loader2, RefreshCcw, Search, Wallet } from 'lucide-react'
 import { apiRequest } from '../api/client.js'
+import { StockChartModal } from '../components/StockChartModal.jsx'
 
 const formatMoney = (value) => new Intl.NumberFormat('en-IN', {
   style: 'currency',
@@ -16,6 +17,7 @@ export const HoldingsPage = () => {
   const [error, setError] = useState('')
   const [selectedAccountId, setSelectedAccountId] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
+  const [selectedChartSymbol, setSelectedChartSymbol] = useState(null)
   const [updatedAt, setUpdatedAt] = useState(null)
 
   const loadHoldings = async () => {
@@ -252,7 +254,25 @@ export const HoldingsPage = () => {
                   return (
                     <tr key={`${h.symbol}-${idx}`}>
                       <td>
-                        <strong style={{ color: 'var(--ink-heading)' }}>{h.symbol}</strong>
+                        <button
+                          type="button"
+                          className="ghost-button"
+                          onClick={() => setSelectedChartSymbol(h.symbol)}
+                          style={{
+                            padding: 0,
+                            minHeight: 'auto',
+                            fontWeight: 600,
+                            color: 'var(--kite-blue)',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            textAlign: 'left',
+                          }}
+                          title="View historical price chart"
+                        >
+                          <BarChart2 size={13} />
+                          {h.symbol}
+                        </button>
                         <small style={{ display: 'block', color: 'var(--muted)', fontSize: 11 }}>
                           {h.exchange}
                         </small>
@@ -294,6 +314,13 @@ export const HoldingsPage = () => {
           </div>
         )}
       </div>
+
+      {selectedChartSymbol && (
+        <StockChartModal
+          symbol={selectedChartSymbol}
+          onClose={() => setSelectedChartSymbol(null)}
+        />
+      )}
     </section>
   )
 }

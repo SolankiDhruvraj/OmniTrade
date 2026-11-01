@@ -18,7 +18,7 @@ export const searchSchema = z.object({
 export const optionChainSchema = z.object({
   query: z.object({
     broker: z.string().default("fyers"),
-    accountId: z.string().min(1),
+    accountId: z.string().optional(),
     symbol: z.string().min(1),
     timestamp: z.string().optional(),
     strikecount: z.string().optional(),
@@ -88,15 +88,26 @@ export const search = asyncHandler(async (req, res) => {
 
 export const optionChain = asyncHandler(async (req, res) => {
   const { accountId, broker, symbol, timestamp, strikecount, greeks } = req.validated.query;
-  const account = await BrokerAccount.findOne({
-    _id: accountId,
-    user: req.user._id,
-    broker,
-    isActive: true,
-  });
+  let account = null;
+
+  if (accountId) {
+    account = await BrokerAccount.findOne({
+      _id: accountId,
+      user: req.user._id,
+      broker,
+      isActive: true,
+    });
+  } else {
+    // Pick first active account for the broker
+    account = await BrokerAccount.findOne({
+      user: req.user._id,
+      broker,
+      isActive: true,
+    });
+  }
 
   if (!account) {
-    throw new AppError("Linked broker account not found", 404);
+    throw new AppError("No active linked Fyers account found to fetch live option chain", 404);
   }
 
   const adapter = BrokerFactory.getBroker(broker);

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Activity, AlertOctagon, Loader2, RefreshCcw, ShieldAlert, X } from 'lucide-react'
+import { Activity, AlertOctagon, BarChart2, Loader2, RefreshCcw, ShieldAlert, X } from 'lucide-react'
 import { apiRequest } from '../api/client.js'
+import { StockChartModal } from '../components/StockChartModal.jsx'
 
 const formatMoney = (value) => new Intl.NumberFormat('en-IN', {
   style: 'currency',
@@ -19,6 +20,7 @@ export const PositionsPage = () => {
   const [exiting, setExiting] = useState(false)
   const [killingSwitch, setKillingSwitch] = useState(false)
   const [killMessage, setKillMessage] = useState('')
+  const [selectedChartSymbol, setSelectedChartSymbol] = useState(null)
   const [error, setError] = useState('')
 
   const loadPositions = async () => {
@@ -211,7 +213,26 @@ export const PositionsPage = () => {
                         />
                       </td>
                       <td>{account.displayName}</td>
-                      <td><strong>{position.symbol}</strong></td>
+                      <td>
+                        <button
+                          type="button"
+                          className="ghost-button"
+                          onClick={() => setSelectedChartSymbol(position.symbol)}
+                          style={{
+                            padding: '2px 6px',
+                            minHeight: 'auto',
+                            fontWeight: 600,
+                            color: 'var(--kite-blue)',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                          title="View historical price chart"
+                        >
+                          <BarChart2 size={13} />
+                          {position.symbol}
+                        </button>
+                      </td>
                       <td>{position.netQty}</td>
                       <td>{formatMoney(position.netAvg)}</td>
                       <td className={position.unrealizedProfit < 0 ? 'negative-value' : 'positive-value'}>{formatMoney(position.unrealizedProfit)}</td>
@@ -260,10 +281,27 @@ export const PositionsPage = () => {
                           type="checkbox"
                         />
                         <div>
-                          <strong style={{ fontSize: '14px', color: 'var(--ink-heading)', display: 'block', wordBreak: 'break-all' }}>
+                          <button
+                            type="button"
+                            className="ghost-button"
+                            onClick={() => setSelectedChartSymbol(position.symbol)}
+                            style={{
+                              padding: '0',
+                              minHeight: 'auto',
+                              fontSize: '14px',
+                              fontWeight: 600,
+                              color: 'var(--kite-blue)',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              textAlign: 'left',
+                            }}
+                            title="View historical price chart"
+                          >
+                            <BarChart2 size={13} />
                             {position.symbol}
-                          </strong>
-                          <span style={{ fontSize: '11px', color: '#64748b' }}>
+                          </button>
+                          <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>
                             {account.displayName} &bull; {position.productType}
                           </span>
                         </div>
@@ -326,6 +364,13 @@ export const PositionsPage = () => {
           </div>
         )}
       </div>
+
+      {selectedChartSymbol && (
+        <StockChartModal
+          symbol={selectedChartSymbol}
+          onClose={() => setSelectedChartSymbol(null)}
+        />
+      )}
     </section>
   )
 }
