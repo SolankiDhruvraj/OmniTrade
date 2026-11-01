@@ -280,6 +280,54 @@ export const handleZerodhaCallback = asyncHandler(async (req, res) => {
   res.redirect(`${env.clientUrl}/accounts?connected=true&account=${encodeURIComponent(account.accountId)}`);
 });
 
+export const getReconnectAuthUrl = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const account = await BrokerAccount.findOne({ _id: id, user: req.user._id });
+  if (!account) {
+    throw new AppError("Broker account not found", 404);
+  }
+
+  if (account.broker === "fyers") {
+    const adapter = BrokerFactory.getBroker("fyers");
+    const stateToken = signOAuthState({ sub: String(req.user._id) });
+    const authUrl = adapter.getAuthUrl({}, stateToken);
+    return res.json({ url: authUrl });
+  }
+
+  if (account.broker === "zerodha") {
+    const credentialsPayload = getBrokerAccessToken(account);
+    let creds = {};
+    try {
+      creds = typeof credentialsPayload === "string" ? JSON.parse(credentialsPayload) : credentialsPayload;
+    } catch {
+      // not JSON
+    }
+
+    const apiKey = creds.apiKey;
+    const apiSecret = creds.apiSecret;
+
+    if (!apiKey || !apiSecret) {
+      throw new AppError("Account does not have stored API credentials. Please re-connect with your API Key and Secret.", 400);
+    }
+
+    const adapter = BrokerFactory.getBroker("zerodha");
+    const loginUrl = adapter.getAuthUrl({ apiKey, apiSecret });
+
+    const statePayload = {
+      sub: String(req.user._id),
+      apiKey,
+      apiSecret,
+      label: account.displayName || "",
+    };
+    const stateToken = signOAuthState(statePayload);
+    const urlWithState = `${loginUrl}&state=${encodeURIComponent(stateToken)}`;
+
+    return res.json({ url: urlWithState });
+  }
+
+  throw new AppError(`Unsupported broker: ${account.broker}`, 400);
+});
+
 export const listBrokerAccounts = asyncHandler(async (req, res) => {
   const accounts = await BrokerAccount.find({ user: req.user._id, isActive: true }).sort({ createdAt: -1 });
   res.json({ accounts: accounts.map((account) => account.toSafeJSON()) });

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Eye, EyeOff, Loader2, Plus, RefreshCcw, Trash2, Unplug, WalletCards, X } from 'lucide-react'
+import { Eye, EyeOff, Loader2, LogIn, Plus, RefreshCcw, Trash2, Unplug, WalletCards, X } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { apiRequest } from '../api/client.js'
 
@@ -221,6 +221,24 @@ export const AccountsPage = () => {
     }
   }
 
+  const [reconnectingId, setReconnectingId] = useState('')
+
+  const reconnectAccount = async (account) => {
+    setError('')
+    setReconnectingId(account.id)
+    try {
+      const data = await apiRequest(`/broker-accounts/${account.id}/reconnect-url`)
+      if (data?.url) {
+        window.location.href = data.url
+      } else {
+        throw new Error('Failed to generate reconnect URL')
+      }
+    } catch (err) {
+      setReconnectingId('')
+      setError(err.message || `Unable to reconnect ${account.displayName}`)
+    }
+  }
+
   const removeAccount = async (id) => {
     await apiRequest(`/broker-accounts/${id}`, { method: 'DELETE' })
     await loadAccounts()
@@ -296,9 +314,25 @@ export const AccountsPage = () => {
                     <small>{account.profile.credentialFields.join(', ')}</small>
                   )}
                 </div>
-                <button className="icon-button danger" onClick={() => removeAccount(account.id)} title="Remove account" type="button">
-                  <Trash2 size={17} />
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <button
+                    className="secondary-button"
+                    disabled={reconnectingId === account.id}
+                    onClick={() => reconnectAccount(account)}
+                    style={{ padding: '6px 12px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                    title="Refresh login token for today"
+                    type="button"
+                  >
+                    {reconnectingId === account.id ? (
+                      <><Loader2 className="spinning" size={14} /> Connecting...</>
+                    ) : (
+                      <><LogIn size={14} color="var(--kite-blue)" /> Re-connect</>
+                    )}
+                  </button>
+                  <button className="icon-button danger" onClick={() => removeAccount(account.id)} title="Remove account" type="button">
+                    <Trash2 size={17} />
+                  </button>
+                </div>
               </article>
             ))}
           </div>

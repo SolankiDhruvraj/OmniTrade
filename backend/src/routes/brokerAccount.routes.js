@@ -19,6 +19,7 @@ import {
   listBrokerOrders,
   listBrokerFunds,
   killSwitchPanicSquareOff,
+  getReconnectAuthUrl,
   paramsSchema,
 } from "../controllers/brokerAccount.controller.js";
 import { requireAuth } from "../middlewares/auth.js";
@@ -60,6 +61,7 @@ router.post("/", requireTrustedOrigin, validate(createBrokerAccountSchema), crea
 router.get("/fyers/auth-url", getFyersAuthUrl);
 // Zerodha auth-url is POST so it can receive { apiKey, apiSecret } in the body for multi-account OAuth
 router.post("/zerodha/auth-url", requireTrustedOrigin, getZerodhaAuthUrl);
+router.get("/:id/reconnect-url", validate(paramsSchema), getReconnectAuthUrl);
 router.delete("/:id", requireTrustedOrigin, validate(paramsSchema), deleteBrokerAccount);
 
 export default router;
