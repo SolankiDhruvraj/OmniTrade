@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
-import { Activity, AlertTriangle, ArrowRight, BookOpen, Briefcase, ChevronDown, History, KeyRound, LogOut, Menu, Search, ShieldAlert, ShieldCheck, User, UserCheck, UserPlus, WalletCards, X } from 'lucide-react'
+import { Activity, AlertTriangle, ArrowRight, BookOpen, Briefcase, ChevronDown, FileText, History, KeyRound, LogOut, Menu, Search, ShieldAlert, ShieldCheck, User, UserCheck, UserPlus, WalletCards, X } from 'lucide-react'
 import { useAuth } from '../context/useAuth.js'
 
 export const Shell = () => {
@@ -129,6 +129,7 @@ export const Shell = () => {
             <>
               <NavLink to="/admin/accounts"><UserCheck size={15} /> All Accounts</NavLink>
               <NavLink to="/admin/transactions"><History size={15} /> All Transactions</NavLink>
+              <NavLink to="/admin/logs"><FileText size={15} /> Logs</NavLink>
               <NavLink to="/admin/invitations"><UserPlus size={15} /> Invitations</NavLink>
             </>
           )}
@@ -289,6 +290,7 @@ export const Shell = () => {
                 <>
                   <NavLink to="/admin/accounts"><UserCheck size={18} /> All Accounts</NavLink>
                   <NavLink to="/admin/transactions"><History size={18} /> All Transactions</NavLink>
+                  <NavLink to="/admin/logs"><FileText size={18} /> Activity Logs</NavLink>
                   <NavLink to="/admin/invitations"><UserPlus size={18} /> Invitations</NavLink>
                 </>
               )}

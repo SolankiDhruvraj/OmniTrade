@@ -5,6 +5,8 @@ import { publishOrderEvent } from "../events/kafkaProducer.js";
 import { addOrderExecutionJobs } from "../queues/order.queue.js";
 import { getBrokerAccessToken } from "./brokerAccount.service.js";
 import { AppError } from "../utils/AppError.js";
+import { AUTH_EXPIRED_MESSAGE } from "../utils/brokerAuth.js";
+import { createAuditLog } from "./auditLog.service.js";
 
 export const extractBrokerOrderId = (response) => {
   if (!response) return "";
@@ -62,6 +64,11 @@ export const createOrderPreview = async ({ userId, brokerAccountIds, orders, acc
     throw new AppError("One or more selected broker accounts are invalid", 400);
   }
 
+  const expiredAccount = accounts.find((a) => a.authStatus === "expired");
+  if (expiredAccount) {
+    throw new AppError(`Auth expired for ${expiredAccount.displayName || expiredAccount.accountId}, please authenticate your broker account again`, 400);
+  }
+
   return OrderBatch.create({
     user: userId,
     brokerAccountIds,
@@ -91,6 +98,11 @@ export const confirmOrderBatch = async ({ userId, batchId }) => {
 
   if (accounts.length !== batch.brokerAccountIds.length) {
     throw new AppError("One or more selected broker accounts are invalid", 400);
+  }
+
+  const expiredAccount = accounts.find((a) => a.authStatus === "expired");
+  if (expiredAccount) {
+    throw new AppError(`Auth expired for ${expiredAccount.displayName || expiredAccount.accountId}, please authenticate your broker account again`, 400);
   }
 
   // Pre-resolve credentials and orders map for ultra-fast, zero-roundtrip worker execution
@@ -164,6 +176,20 @@ export const confirmOrderBatch = async ({ userId, batchId }) => {
   await publishOrderEvent("order.batch.queued", {
     batchId: batch._id,
     accountCount: executions.length,
+  });
+
+  const orderSummary = orders.map((o) => `${o.side === 1 ? "BUY" : "SELL"} ${o.qty} ${o.symbol}`).join(", ");
+  createAuditLog({
+    userId,
+    action: "order_batch_confirmed",
+    category: "order",
+    status: "info",
+    message: `Order batch placed across ${executions.length} accounts: ${orderSummary}`,
+    metadata: {
+      batchId: batch._id,
+      accountCount: executions.length,
+      orders: orders.map((o) => ({ symbol: o.symbol, side: o.side, qty: o.qty, type: o.type, product: o.productType })),
+    },
   });
 
   return { batch, executions };

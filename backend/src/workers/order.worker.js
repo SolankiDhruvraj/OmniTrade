@@ -8,6 +8,8 @@ import { OrderExecution } from "../models/OrderExecution.js";
 import { publishOrderEvent } from "../events/kafkaProducer.js";
 import { getBrokerAccessToken } from "../services/brokerAccount.service.js";
 import { extractBrokerOrderId, refreshBatchStatus } from "../services/order.service.js";
+import { AUTH_EXPIRED_MESSAGE, isBrokerAuthExpired } from "../utils/brokerAuth.js";
+import { createAuditLog } from "../services/auditLog.service.js";
 
 const placeOrderForExecution = async (job) => {
   const { executionId, batchId, brokerAccountId, orders: preloadedOrders, credentials: preloadedCredentials } = job.data;
@@ -95,9 +97,21 @@ const placeOrderForExecution = async (job) => {
       brokerOrderId,
     }).catch(() => {});
 
+    createAuditLog({
+      action: "order_execution_success",
+      category: "order",
+      status: "success",
+      message: `${broker.toUpperCase()} order execution succeeded (Order ID: ${brokerOrderId || "N/A"})`,
+      metadata: { batchId, executionId, brokerAccountId, broker, brokerOrderId },
+    });
+
     return { status: "success", brokerOrderId };
   } catch (error) {
-    const errorMessage = error.message || "Order failed";
+    const isExpired = isBrokerAuthExpired(error, broker);
+    if (isExpired && brokerAccountId) {
+      BrokerAccount.updateOne({ _id: brokerAccountId }, { $set: { authStatus: "expired", authExpiredAt: new Date() } }).catch(() => {});
+    }
+    const errorMessage = isExpired ? AUTH_EXPIRED_MESSAGE : (error.message || "Order failed");
     await OrderExecution.updateOne(
       { _id: executionId },
       {
@@ -117,6 +131,14 @@ const placeOrderForExecution = async (job) => {
       broker,
       errorMessage,
     }).catch(() => {});
+
+    createAuditLog({
+      action: isExpired ? "broker_auth_expired" : "order_execution_failed",
+      category: isExpired ? "security" : "order",
+      status: "failed",
+      message: `${broker.toUpperCase()} order execution failed: ${errorMessage}`,
+      metadata: { batchId, executionId, brokerAccountId, broker, errorMessage },
+    });
 
     throw error;
   }

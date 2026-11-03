@@ -9,6 +9,7 @@ import { AcceptInvitationPage } from './pages/AcceptInvitationPage.jsx'
 import { InvitationsPage } from './pages/InvitationsPage.jsx'
 import { AdminAccountsPage } from './pages/AdminAccountsPage.jsx'
 import { AdminTransactionsPage } from './pages/AdminTransactionsPage.jsx'
+import { AdminLogsPage } from './pages/AdminLogsPage.jsx'
 import { AuthPage } from './pages/AuthPage.jsx'
 import { OrdersPage } from './pages/OrdersPage.jsx'
 import { PositionsPage } from './pages/PositionsPage.jsx'
@@ -65,6 +66,14 @@ const App = () => {
               element={(
                 <ProtectedAdminRoute>
                   <AdminTransactionsPage />
+                </ProtectedAdminRoute>
+              )}
+            />
+            <Route
+              path="admin/logs"
+              element={(
+                <ProtectedAdminRoute>
+                  <AdminLogsPage />
                 </ProtectedAdminRoute>
               )}
             />

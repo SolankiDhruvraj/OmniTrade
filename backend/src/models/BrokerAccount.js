@@ -33,6 +33,15 @@ const brokerAccountSchema = new mongoose.Schema({
     type: Boolean,
     default: true,
   },
+  authStatus: {
+    type: String,
+    enum: ["active", "expired"],
+    default: "active",
+  },
+  authExpiredAt: {
+    type: Date,
+    default: null,
+  },
 }, { timestamps: true });
 
 brokerAccountSchema.index({ user: 1, broker: 1, accountId: 1 }, { unique: true });
@@ -55,6 +64,8 @@ brokerAccountSchema.methods.toSafeJSON = function toSafeJSON() {
     displayName: this.displayName,
     profile: sanitizedProfile,
     isActive: this.isActive,
+    authStatus: this.authStatus || "active",
+    authExpiredAt: this.authExpiredAt || null,
     createdAt: this.createdAt,
     updatedAt: this.updatedAt,
   };

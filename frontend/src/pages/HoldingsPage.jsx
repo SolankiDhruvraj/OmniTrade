@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowDownRight, ArrowUpRight, BarChart2, Briefcase, ChevronRight, Layers, Loader2, RefreshCcw, Search, Wallet } from 'lucide-react'
+import { AlertTriangle, ArrowDownRight, ArrowUpRight, BarChart2, Briefcase, ChevronRight, Layers, Loader2, LogIn, RefreshCcw, Search, Wallet } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { apiRequest } from '../api/client.js'
 import { StockChartModal } from '../components/StockChartModal.jsx'
 
@@ -212,6 +213,32 @@ export const HoldingsPage = () => {
           <div className="center-state" style={{ minHeight: '200px', textAlign: 'center', padding: '40px 0' }}>
             <Loader2 className="spinning" size={28} style={{ color: 'var(--kite-blue)', margin: '0 auto 8px' }} />
             <p style={{ color: '#666', fontSize: 13 }}>Loading holdings from broker...</p>
+          </div>
+        ) : currentAccount?.authExpired ? (
+          <div className="empty-state" style={{ padding: '40px 20px', textAlign: 'center', backgroundColor: '#fff5f5', borderRadius: '8px', border: '1px solid #fecaca' }}>
+            <AlertTriangle size={36} style={{ color: '#dc2626', margin: '0 auto 10px' }} />
+            <strong style={{ display: 'block', fontSize: 15, color: '#991b1b' }}>
+              Auth expired for {currentAccount.displayName}
+            </strong>
+            <span style={{ fontSize: 13, color: '#7f1d1d', margin: '6px 0 16px', display: 'block' }}>
+              Auth expired, please authenticate your broker account again to view live holdings.
+            </span>
+            <Link
+              to="/accounts"
+              className="primary-button"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 16px',
+                backgroundColor: '#dc2626',
+                borderColor: '#b91c1c',
+                color: '#ffffff',
+                textDecoration: 'none',
+              }}
+            >
+              <LogIn size={15} /> Re-authenticate Account
+            </Link>
           </div>
         ) : !currentAccount ? (
           <div className="empty-state" style={{ padding: '48px 0', textAlign: 'center' }}>

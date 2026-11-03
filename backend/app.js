@@ -8,6 +8,7 @@ import authRoutes from "./src/routes/auth.routes.js";
 import brokerAccountRoutes from "./src/routes/brokerAccount.routes.js";
 import instrumentRoutes from "./src/routes/instrument.routes.js";
 import orderRoutes from "./src/routes/order.routes.js";
+import adminLogRoutes from "./src/routes/adminLog.routes.js";
 
 const app = express();
 
@@ -35,6 +36,7 @@ app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/broker-accounts", brokerAccountRoutes);
 app.use("/api/v1/instruments", instrumentRoutes);
 app.use("/api/v1/orders", orderRoutes);
+app.use("/api/v1/admin/logs", adminLogRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ message: "Route not found" });

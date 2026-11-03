@@ -8,6 +8,9 @@ import { connectBrokerAccount, createManualBrokerAccount, getBrokerAccessToken }
 import { AppError } from "../utils/AppError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { signOAuthState, verifyOAuthState } from "../utils/jwt.js";
+import { AUTH_EXPIRED_MESSAGE, isBrokerAuthExpired } from "../utils/brokerAuth.js";
+import { isAdminUser } from "../utils/adminAccess.js";
+import { createAuditLog } from "../services/auditLog.service.js";
 
 const brokerValues = ["fyers", "zerodha"];
 
@@ -334,14 +337,24 @@ export const listBrokerAccounts = asyncHandler(async (req, res) => {
 });
 
 export const listBrokerPositions = asyncHandler(async (req, res) => {
-  const accounts = await BrokerAccount.find({ user: req.user._id, isActive: true }).sort({ createdAt: -1 });
+  const isAdmin = isAdminUser(req.user);
+  const filter = isAdmin && req.query.allUsers === "true"
+    ? { isActive: true }
+    : { user: req.user._id, isActive: true };
+
+  const accounts = await BrokerAccount.find(filter)
+    .populate("user", "name email")
+    .sort({ createdAt: -1 });
+
   const results = await Promise.all(accounts.map(async (account) => {
+    const userMeta = account.user ? { id: account.user._id, name: account.user.name, email: account.user.email } : null;
     if (account.broker !== "fyers" && account.broker !== "zerodha") {
       return {
         brokerAccountId: String(account._id),
         broker: account.broker,
         accountId: account.accountId,
         displayName: account.displayName,
+        user: userMeta,
         error: `Positions are not yet supported for ${account.broker}`,
         positions: [],
       };
@@ -358,15 +371,22 @@ export const listBrokerPositions = asyncHandler(async (req, res) => {
         broker: account.broker,
         accountId: account.accountId,
         displayName: account.displayName,
+        user: userMeta,
         positions,
       };
     } catch (error) {
+      const isExpired = isBrokerAuthExpired(error, account.broker);
+      if (isExpired) {
+        BrokerAccount.updateOne({ _id: account._id }, { $set: { authStatus: "expired", authExpiredAt: new Date() } }).catch(() => {});
+      }
       return {
         brokerAccountId: String(account._id),
         broker: account.broker,
         accountId: account.accountId,
         displayName: account.displayName,
-        error: error.message || "Unable to fetch positions",
+        user: userMeta,
+        authExpired: isExpired,
+        error: isExpired ? AUTH_EXPIRED_MESSAGE : (error.message || "Unable to fetch positions"),
         positions: [],
       };
     }
@@ -419,12 +439,17 @@ export const listBrokerHoldings = asyncHandler(async (req, res) => {
         },
       };
     } catch (error) {
+      const isExpired = isBrokerAuthExpired(error, account.broker);
+      if (isExpired) {
+        BrokerAccount.updateOne({ _id: account._id }, { $set: { authStatus: "expired", authExpiredAt: new Date() } }).catch(() => {});
+      }
       return {
         brokerAccountId: String(account._id),
         broker: account.broker,
         accountId: account.accountId,
         displayName: account.displayName,
-        error: error.message || "Unable to fetch holdings",
+        authExpired: isExpired,
+        error: isExpired ? AUTH_EXPIRED_MESSAGE : (error.message || "Unable to fetch holdings"),
         holdings: [],
         summary: { totalInvested: 0, totalCurrent: 0, totalPnl: 0, totalPnlPercentage: 0, count: 0 },
       };
@@ -435,14 +460,24 @@ export const listBrokerHoldings = asyncHandler(async (req, res) => {
 });
 
 export const listBrokerOrders = asyncHandler(async (req, res) => {
-  const accounts = await BrokerAccount.find({ user: req.user._id, isActive: true }).sort({ createdAt: -1 });
+  const isAdmin = isAdminUser(req.user);
+  const filter = isAdmin && req.query.allUsers === "true"
+    ? { isActive: true }
+    : { user: req.user._id, isActive: true };
+
+  const accounts = await BrokerAccount.find(filter)
+    .populate("user", "name email")
+    .sort({ createdAt: -1 });
+
   const results = await Promise.all(accounts.map(async (account) => {
+    const userMeta = account.user ? { id: account.user._id, name: account.user.name, email: account.user.email } : null;
     if (account.broker !== "fyers" && account.broker !== "zerodha") {
       return {
         brokerAccountId: String(account._id),
         broker: account.broker,
         accountId: account.accountId,
         displayName: account.displayName,
+        user: userMeta,
         error: `Orders are not yet supported for ${account.broker}`,
         orders: [],
       };
@@ -461,15 +496,22 @@ export const listBrokerOrders = asyncHandler(async (req, res) => {
         broker: account.broker,
         accountId: account.accountId,
         displayName: account.displayName,
+        user: userMeta,
         orders,
       };
     } catch (error) {
+      const isExpired = isBrokerAuthExpired(error, account.broker);
+      if (isExpired) {
+        BrokerAccount.updateOne({ _id: account._id }, { $set: { authStatus: "expired", authExpiredAt: new Date() } }).catch(() => {});
+      }
       return {
         brokerAccountId: String(account._id),
         broker: account.broker,
         accountId: account.accountId,
         displayName: account.displayName,
-        error: error.message || "Unable to fetch orders",
+        user: userMeta,
+        authExpired: isExpired,
+        error: isExpired ? AUTH_EXPIRED_MESSAGE : (error.message || "Unable to fetch orders"),
         orders: [],
       };
     }
@@ -514,6 +556,15 @@ export const exitBrokerPositions = asyncHandler(async (req, res) => {
       if (response?.s && response.s !== "ok") {
         throw new AppError(response.message || `${account.broker} rejected the position exit`, 502);
       }
+      createAuditLog({
+        userId: req.user._id,
+        action: "position_exit_submitted",
+        category: "order",
+        status: "info",
+        message: `Position exit submitted for ${livePosition.symbol || positionId} in ${account.displayName}`,
+        metadata: { brokerAccountId, symbol: livePosition.symbol, positionId, netQty },
+        req,
+      });
       return {
         brokerAccountId,
         accountName: account.displayName,
@@ -523,12 +574,17 @@ export const exitBrokerPositions = asyncHandler(async (req, res) => {
         response,
       };
     } catch (error) {
+      const isExpired = isBrokerAuthExpired(error, account.broker);
+      if (isExpired) {
+        BrokerAccount.updateOne({ _id: account._id }, { $set: { authStatus: "expired", authExpiredAt: new Date() } }).catch(() => {});
+      }
       return {
         brokerAccountId,
         accountName: account.displayName,
         positionId,
         status: "failed",
-        error: error.message || "Unable to exit position",
+        authExpired: isExpired,
+        error: isExpired ? AUTH_EXPIRED_MESSAGE : (error.message || "Unable to exit position"),
       };
     }
   }));
@@ -566,13 +622,18 @@ export const listBrokerFunds = asyncHandler(async (req, res) => {
         funds,
       };
     } catch (err) {
+      const isExpired = isBrokerAuthExpired(err, account.broker);
+      if (isExpired) {
+        BrokerAccount.updateOne({ _id: account._id }, { $set: { authStatus: "expired", authExpiredAt: new Date() } }).catch(() => {});
+      }
       return {
         brokerAccountId: String(account._id),
         broker: account.broker,
         accountId: account.accountId,
         displayName: account.displayName,
+        authExpired: isExpired,
         funds: { availableCash: 0, availableMargin: 0, usedMargin: 0, collateral: 0 },
-        error: err.message || "Failed to fetch funds",
+        error: isExpired ? AUTH_EXPIRED_MESSAGE : (err.message || "Failed to fetch funds"),
       };
     }
   }));
@@ -680,6 +741,16 @@ export const killSwitchPanicSquareOff = asyncHandler(async (req, res) => {
 
   const totalCancelled = accountReports.reduce((sum, r) => sum + r.cancelledOrders.length, 0);
   const totalExited = accountReports.reduce((sum, r) => sum + r.exitedPositions.length, 0);
+
+  createAuditLog({
+    userId: req.user._id,
+    action: "kill_switch_triggered",
+    category: "security",
+    status: "warning",
+    message: `Console Kill Switch triggered: cancelled ${totalCancelled} open orders and squared off ${totalExited} console positions`,
+    metadata: { totalCancelled, totalExited, accountReports },
+    req,
+  });
 
   res.json({
     message: `Console Kill switch executed: ${totalCancelled} console open orders cancelled, ${totalExited} console positions squared off. External orders were untouched.`,

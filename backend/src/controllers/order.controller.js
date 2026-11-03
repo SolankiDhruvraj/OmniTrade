@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { confirmOrderBatch, createOrderPreview, listAllAdminOrderBatches, listOrderBatches } from "../services/order.service.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import { isAdminUser } from "../utils/adminAccess.js";
 
 const orderPayloadSchema = z.object({
   symbol: z.string().min(1),
@@ -56,6 +57,12 @@ export const confirmOrder = asyncHandler(async (req, res) => {
 export const listOrders = asyncHandler(async (req, res) => {
   const page = req.query.page;
   const limit = req.query.limit;
+  const isAdmin = isAdminUser(req.user);
+  if (isAdmin && req.query.allUsers === "true") {
+    const brokerAccount = req.query.brokerAccount || req.query.q || "";
+    const result = await listAllAdminOrderBatches({ page, limit, brokerAccount });
+    return res.json(result);
+  }
   const result = await listOrderBatches({ userId: req.user._id, page, limit });
   res.json(result);
 });

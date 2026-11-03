@@ -1,6 +1,7 @@
 import { BrokerFactory } from "../brokers/BrokerFactory.js";
 import { BrokerAccount } from "../models/BrokerAccount.js";
 import { decryptText, encryptText } from "../utils/crypto.js";
+import { createAuditLog } from "./auditLog.service.js";
 
 const pickProfileData = (profileResponse) => profileResponse?.data || profileResponse || {};
 const secretFieldNames = new Set(["apiKey", "apiSecret", "accessToken", "refreshToken", "totpSecret", "password", "pin"]);
@@ -38,9 +39,20 @@ export const connectBrokerAccount = async ({ userId, broker, authCode, customCre
       encryptedAccessToken: encryptText(credentialPayload),
       profile,
       isActive: true,
+      authStatus: "active",
+      authExpiredAt: null,
     },
     { upsert: true, new: true, setDefaultsOnInsert: true },
   );
+
+  createAuditLog({
+    userId,
+    action: "broker_account_authenticated",
+    category: "broker",
+    status: "success",
+    message: `${broker.toUpperCase()} account "${displayName}" (${accountId}) was successfully authenticated`,
+    metadata: { broker, accountId, displayName },
+  });
 
   return account.toSafeJSON();
 };
@@ -84,9 +96,20 @@ export const createManualBrokerAccount = async ({ userId, broker, accountId, dis
       encryptedAccessToken: encryptText(credentialsPayload),
       profile: profileData,
       isActive: true,
+      authStatus: "active",
+      authExpiredAt: null,
     },
     { upsert: true, new: true, setDefaultsOnInsert: true },
   );
+
+  createAuditLog({
+    userId,
+    action: "broker_account_added",
+    category: "broker",
+    status: "success",
+    message: `Manual ${broker.toUpperCase()} account "${displayName}" (${accountId}) was added`,
+    metadata: { broker, accountId, displayName, connectionType: "manual" },
+  });
 
   return account.toSafeJSON();
 };

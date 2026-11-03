@@ -12,6 +12,7 @@ import { signToken, signTwoFactorChallenge, verifyToken } from "../utils/jwt.js"
 import { isAdminUser } from "../utils/adminAccess.js";
 import { env } from "../config/env.js";
 import { sendInvitationEmail, sendPasswordResetEmail } from "../services/email.service.js";
+import { createAuditLog } from "../services/auditLog.service.js";
 
 const issuer = "F&O Console";
 const recoveryCodeCount = 8;
@@ -403,6 +404,14 @@ export const login = asyncHandler(async (req, res) => {
   const user = await User.findOne({ email }).select("+totpSecret");
 
   if (!user || !(await user.comparePassword(password))) {
+    createAuditLog({
+      userEmail: email,
+      action: "user_login_failed",
+      category: "auth",
+      status: "failed",
+      message: `Failed login attempt for ${email}`,
+      req,
+    });
     throw new AppError("Invalid email or password", 401);
   }
 
@@ -423,6 +432,17 @@ export const login = asyncHandler(async (req, res) => {
       expiresIn: 300,
     });
   }
+
+  createAuditLog({
+    userId: user._id,
+    userEmail: user.email,
+    userName: user.name,
+    action: "user_login",
+    category: "auth",
+    status: "success",
+    message: `User ${user.name || user.email} logged in successfully`,
+    req,
+  });
 
   sendAuth(res, user);
 });
@@ -447,8 +467,27 @@ export const verifyTwoFactorLogin = asyncHandler(async (req, res) => {
     || user.activeTwoFactorChallengeExpiresAt <= new Date()
     || !(await consumeSecondFactor(user, code.trim(), challenge.jti))
   ) {
+    createAuditLog({
+      userId: challenge.sub,
+      action: "user_login_failed",
+      category: "auth",
+      status: "failed",
+      message: "2FA verification code rejected during login",
+      req,
+    });
     throw invalidCodeError();
   }
+
+  createAuditLog({
+    userId: user._id,
+    userEmail: user.email,
+    userName: user.name,
+    action: "user_2fa_login",
+    category: "auth",
+    status: "success",
+    message: `User ${user.name || user.email} completed 2FA login`,
+    req,
+  });
 
   sendAuth(res, user);
 });
@@ -620,6 +659,18 @@ export const me = asyncHandler(async (req, res) => {
 });
 
 export const logout = asyncHandler(async (req, res) => {
+  if (req.user) {
+    createAuditLog({
+      userId: req.user._id,
+      userEmail: req.user.email,
+      userName: req.user.name,
+      action: "user_logout",
+      category: "auth",
+      status: "info",
+      message: `User ${req.user.name || req.user.email} logged out`,
+      req,
+    });
+  }
   res.clearCookie("token", {
     httpOnly: true,
     sameSite: "lax",

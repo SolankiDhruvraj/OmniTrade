@@ -1,11 +1,15 @@
 import { useEffect, useState } from 'react'
-import { CheckCircle2, ChevronLeft, ChevronRight, Clock, History, Loader2, RefreshCcw, ShieldCheck, XCircle } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Clock, History, Loader2, LogIn, RefreshCcw, ShieldCheck, Users, XCircle } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { apiRequest } from '../api/client.js'
+import { useAuth } from '../context/useAuth.js'
 
 const PAGE_SIZE = 10
 
 export const OrdersPage = () => {
+  const { user } = useAuth()
   const [activeTab, setActiveTab] = useState('broker') // 'broker' (live broker orderbook) or 'batches' (local execution batches)
+  const [showAllUsers, setShowAllUsers] = useState(false)
   const [batches, setBatches] = useState([])
   const [pagination, setPagination] = useState({
     page: 1,
@@ -24,16 +28,19 @@ export const OrdersPage = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  const loadOrders = async (targetPage = pagination.page) => {
+  const loadOrders = async (targetPage = pagination.page, allUsers = showAllUsers) => {
     setLoading(true)
     setError('')
     try {
+      const allParam = user?.isAdmin && allUsers ? '&allUsers=true' : ''
+      const allParamBare = user?.isAdmin && allUsers ? '?allUsers=true' : ''
+
       if (activeTab === 'batches') {
-        const data = await apiRequest(`/orders?page=${targetPage}&limit=${PAGE_SIZE}`)
+        const data = await apiRequest(`/orders?page=${targetPage}&limit=${PAGE_SIZE}${allParam}`)
         setBatches(data.batches || [])
         if (data.pagination) setPagination(data.pagination)
       } else {
-        const data = await apiRequest('/broker-accounts/broker-orders')
+        const data = await apiRequest(`/broker-accounts/broker-orders${allParamBare}`)
         setBrokerAccounts(data.accounts || [])
       }
     } catch (err) {
@@ -44,12 +51,12 @@ export const OrdersPage = () => {
   }
 
   useEffect(() => {
-    loadOrders(1)
-  }, [activeTab])
+    loadOrders(1, showAllUsers)
+  }, [activeTab, showAllUsers])
 
   const handlePageChange = (newPage) => {
     if (newPage < 1 || newPage > pagination.totalPages || newPage === pagination.page) return
-    loadOrders(newPage)
+    loadOrders(newPage, showAllUsers)
   }
 
   // Flatten & filter live broker orders
@@ -67,6 +74,7 @@ export const OrdersPage = () => {
             accountName: acc.displayName,
             broker: acc.broker,
             brokerAccountId: acc.brokerAccountId,
+            user: acc.user,
           })
         })
       }
@@ -119,9 +127,22 @@ export const OrdersPage = () => {
           <h1>Orders</h1>
           <p>Live exchange order book across connected brokers and batch execution history.</p>
         </div>
-        <button className="secondary-button" disabled={loading} onClick={() => loadOrders(pagination.page)} title="Refresh orders" type="button">
-          <RefreshCcw className={loading ? 'spinning' : ''} size={16} />
-        </button>
+        <div className="toolbar" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          {user?.isAdmin && (
+            <button
+              className={showAllUsers ? "primary-button" : "secondary-button"}
+              onClick={() => setShowAllUsers((prev) => !prev)}
+              type="button"
+              style={{ fontSize: '13px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+              title="Toggle between your accounts and all users in the system"
+            >
+              <Users size={15} /> {showAllUsers ? 'Viewing All Users' : 'View All Users'}
+            </button>
+          )}
+          <button className="secondary-button" disabled={loading} onClick={() => loadOrders(pagination.page, showAllUsers)} title="Refresh orders" type="button">
+            <RefreshCcw className={loading ? 'spinning' : ''} size={16} />
+          </button>
+        </div>
       </div>
 
       {error && <div className="alert error">{error}</div>}
@@ -218,6 +239,56 @@ export const OrdersPage = () => {
             )}
           </div>
 
+          {/* Account-level Warnings / Auth Expired Alerts */}
+          {!loading && brokerAccounts.some((acc) => acc.error) && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+              {brokerAccounts.filter((acc) => acc.error).map((acc) => (
+                <div
+                  key={acc.brokerAccountId}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 12,
+                    padding: '8px 14px',
+                    borderRadius: 4,
+                    fontSize: 13,
+                    backgroundColor: acc.authExpired ? '#fef2f2' : '#fff5f5',
+                    border: `1px solid ${acc.authExpired ? '#fca5a5' : '#fed7d7'}`,
+                    color: acc.authExpired ? '#991b1b' : '#c53030',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {acc.authExpired ? <AlertTriangle size={16} color="#dc2626" /> : null}
+                    <span>
+                      <strong>{acc.displayName}</strong>: {acc.error}
+                    </span>
+                  </div>
+                  {acc.authExpired && (
+                    <Link
+                      to="/accounts"
+                      className="primary-button"
+                      style={{
+                        padding: '3px 10px',
+                        fontSize: '12px',
+                        textDecoration: 'none',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        backgroundColor: '#dc2626',
+                        borderColor: '#b91c1c',
+                        color: '#ffffff',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <LogIn size={13} /> Re-authenticate
+                    </Link>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
           {loading ? (
             <div className="center-state" style={{ minHeight: '180px', textAlign: 'center', padding: '40px 0' }}>
               <Loader2 className="spinning" size={26} style={{ color: 'var(--kite-blue)', margin: '0 auto 8px' }} />
@@ -289,6 +360,11 @@ export const OrdersPage = () => {
                           <span className="badge" style={{ textTransform: 'capitalize' }}>
                             {order.accountName || order.broker}
                           </span>
+                          {order.user?.email && (
+                            <small style={{ display: 'block', color: 'var(--muted)', fontSize: '10px', marginTop: '2px' }}>
+                              {order.user.name || order.user.email}
+                            </small>
+                          )}
                         </td>
                       )}
                     </tr>
@@ -323,6 +399,7 @@ export const OrdersPage = () => {
                       <th>Symbol</th>
                       <th>Status</th>
                       <th>Accounts</th>
+                      {showAllUsers && <th>User</th>}
                       <th>Result</th>
                     </tr>
                   </thead>
@@ -339,6 +416,12 @@ export const OrdersPage = () => {
                         </td>
                         <td><span className={`status ${batch.status}`}>{batch.status}</span></td>
                         <td>{batch.brokerAccountIds?.length || 0}</td>
+                        {showAllUsers && (
+                          <td>
+                            <strong>{batch.user?.name || '—'}</strong>
+                            <small style={{ display: 'block', color: 'var(--muted)', fontSize: '11px' }}>{batch.user?.email || ''}</small>
+                          </td>
+                        )}
                         <td>
                           {(batch.executions || []).map((execution) => (
                             <div className="execution-line" key={execution._id}>

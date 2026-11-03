@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Eye, EyeOff, Loader2, LogIn, Plus, RefreshCcw, Trash2, Unplug, WalletCards, X } from 'lucide-react'
+import { AlertTriangle, CheckCircle, Eye, EyeOff, Loader2, LogIn, Plus, RefreshCcw, Trash2, Unplug, WalletCards, X } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { apiRequest } from '../api/client.js'
 
@@ -304,39 +304,109 @@ export const AccountsPage = () => {
           </div>
         ) : (
           <div className="account-grid">
-            {accounts.map((account) => (
-              <article className="account-card" key={account.id}>
-                <div className="account-card-header">
-                  <span className="badge">{account.broker}</span>
-                  <button className="icon-button danger" onClick={() => removeAccount(account.id)} title="Remove account" type="button">
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-                <div className="account-card-body">
-                  <h3>{account.displayName}</h3>
-                  <p>{account.accountId}</p>
-                  {account.profile?.credentialFields?.length > 0 && (
-                    <small>{account.profile.credentialFields.join(', ')}</small>
-                  )}
-                </div>
-                <div className="account-card-actions">
-                  <button
-                    className="secondary-button"
-                    disabled={reconnectingId === account.id}
-                    onClick={() => reconnectAccount(account)}
-                    style={{ width: '100%', justifyContent: 'center', padding: '7px 12px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}
-                    title="Refresh login token for today"
-                    type="button"
-                  >
-                    {reconnectingId === account.id ? (
-                      <><Loader2 className="spinning" size={14} /> Connecting...</>
-                    ) : (
-                      <><LogIn size={14} color="var(--kite-blue)" /> Re-connect Account</>
+            {accounts.map((account) => {
+              const isExpired = account.authStatus === 'expired'
+              return (
+                <article
+                  className={`account-card ${isExpired ? 'auth-expired-card' : ''}`}
+                  key={account.id}
+                  style={isExpired ? { borderColor: '#ef4444', backgroundColor: '#fffafa' } : {}}
+                >
+                  <div className="account-card-header">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span className="badge">{account.broker}</span>
+                      {isExpired ? (
+                        <span
+                          style={{
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            padding: '2px 8px',
+                            borderRadius: '12px',
+                            backgroundColor: '#fee2e2',
+                            color: '#b91c1c',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                        >
+                          <AlertTriangle size={12} /> Auth Expired
+                        </span>
+                      ) : (
+                        <span
+                          style={{
+                            fontSize: '11px',
+                            fontWeight: 500,
+                            padding: '2px 8px',
+                            borderRadius: '12px',
+                            backgroundColor: '#ecfdf5',
+                            color: '#047857',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                        >
+                          <CheckCircle size={12} /> Active
+                        </span>
+                      )}
+                    </div>
+                    <button className="icon-button danger" onClick={() => removeAccount(account.id)} title="Remove account" type="button">
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                  <div className="account-card-body">
+                    <h3>{account.displayName}</h3>
+                    <p>{account.accountId}</p>
+                    {isExpired && (
+                      <div
+                        style={{
+                          margin: '8px 0 4px',
+                          padding: '6px 10px',
+                          borderRadius: '4px',
+                          background: '#fef2f2',
+                          border: '1px solid #fecaca',
+                          color: '#991b1b',
+                          fontSize: '12px',
+                          fontWeight: 500,
+                          lineHeight: 1.4,
+                        }}
+                      >
+                        Auth expired, please authenticate your broker account again.
+                      </div>
                     )}
-                  </button>
-                </div>
-              </article>
-            ))}
+                    {account.profile?.credentialFields?.length > 0 && (
+                      <small>{account.profile.credentialFields.join(', ')}</small>
+                    )}
+                  </div>
+                  <div className="account-card-actions">
+                    <button
+                      className={isExpired ? "primary-button" : "secondary-button"}
+                      disabled={reconnectingId === account.id}
+                      onClick={() => reconnectAccount(account)}
+                      style={{
+                        width: '100%',
+                        justifyContent: 'center',
+                        padding: '8px 12px',
+                        fontSize: '12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        ...(isExpired ? { background: '#dc2626', borderColor: '#b91c1c', color: '#fff' } : {})
+                      }}
+                      title="Authenticate login token for today"
+                      type="button"
+                    >
+                      {reconnectingId === account.id ? (
+                        <><Loader2 className="spinning" size={14} /> Connecting...</>
+                      ) : isExpired ? (
+                        <><LogIn size={14} /> Re-authenticate Now</>
+                      ) : (
+                        <><LogIn size={14} color="var(--kite-blue)" /> Re-connect Account</>
+                      )}
+                    </button>
+                  </div>
+                </article>
+              )
+            })}
           </div>
         )}
       </div>

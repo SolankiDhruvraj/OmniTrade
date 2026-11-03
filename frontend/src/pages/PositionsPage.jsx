@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Activity, AlertOctagon, BarChart2, Loader2, RefreshCcw, ShieldAlert, X } from 'lucide-react'
+import { Activity, AlertOctagon, AlertTriangle, BarChart2, Loader2, LogIn, RefreshCcw, ShieldAlert, Users, X } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { apiRequest } from '../api/client.js'
+import { useAuth } from '../context/useAuth.js'
 import { StockChartModal } from '../components/StockChartModal.jsx'
 
 const formatMoney = (value) => new Intl.NumberFormat('en-IN', {
@@ -12,6 +14,8 @@ const formatMoney = (value) => new Intl.NumberFormat('en-IN', {
 const selectionKey = ({ brokerAccountId, positionId }) => `${brokerAccountId}:${positionId}`
 
 export const PositionsPage = () => {
+  const { user } = useAuth()
+  const [showAllUsers, setShowAllUsers] = useState(false)
   const [accounts, setAccounts] = useState([])
   const [selected, setSelected] = useState([])
   const [results, setResults] = useState([])
@@ -23,11 +27,12 @@ export const PositionsPage = () => {
   const [selectedChartSymbol, setSelectedChartSymbol] = useState(null)
   const [error, setError] = useState('')
 
-  const loadPositions = async () => {
+  const loadPositions = async (allUsers = showAllUsers) => {
     setLoading(true)
     setError('')
     try {
-      const data = await apiRequest('/broker-accounts/positions')
+      const url = user?.isAdmin && allUsers ? '/broker-accounts/positions?allUsers=true' : '/broker-accounts/positions'
+      const data = await apiRequest(url)
       setAccounts(data.accounts)
       setUpdatedAt(data.updatedAt)
       setSelected((current) => current.filter((item) => (
@@ -43,8 +48,8 @@ export const PositionsPage = () => {
   }
 
   useEffect(() => {
-    queueMicrotask(() => loadPositions())
-  }, [])
+    queueMicrotask(() => loadPositions(showAllUsers))
+  }, [showAllUsers])
 
   const handleKillSwitch = async () => {
     const confirmation = window.prompt(
@@ -125,10 +130,21 @@ export const PositionsPage = () => {
       <div className="page-header">
         <div>
           <h1>Positions</h1>
-          <p>Live open positions by Fyers account.</p>
+          <p>Live open positions across connected broker accounts.</p>
         </div>
         <div className="toolbar">
-          <button className="secondary-button" disabled={loading || exiting} onClick={loadPositions} title="Refresh positions" type="button">
+          {user?.isAdmin && (
+            <button
+              className={showAllUsers ? "primary-button" : "secondary-button"}
+              onClick={() => setShowAllUsers((prev) => !prev)}
+              type="button"
+              style={{ fontSize: '13px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+              title="Toggle between your accounts and all users in the system"
+            >
+              <Users size={15} /> {showAllUsers ? 'Viewing All Users' : 'View All Users'}
+            </button>
+          )}
+          <button className="secondary-button" disabled={loading || exiting} onClick={() => loadPositions(showAllUsers)} title="Refresh positions" type="button">
             <RefreshCcw className={loading ? 'spinning' : ''} size={16} />
           </button>
           <button className="danger-button" disabled={!selected.length || exiting} onClick={exitSelected} type="button">
@@ -212,7 +228,12 @@ export const PositionsPage = () => {
                           type="checkbox"
                         />
                       </td>
-                      <td>{account.displayName}</td>
+                      <td>
+                        <div>{account.displayName}</div>
+                        {account.user?.email && (
+                          <small style={{ color: '#64748b', fontSize: '11px' }}>{account.user.name || account.user.email}</small>
+                        )}
+                      </td>
                       <td>
                         <button
                           type="button"
@@ -355,10 +376,47 @@ export const PositionsPage = () => {
           </>
         )}
         {!loading && accounts.some((account) => account.error) && (
-          <div className="position-errors">
+          <div className="position-errors" style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {accounts.filter((account) => account.error).map((account) => (
-              <div className="alert error" key={account.brokerAccountId}>
-                {account.displayName}: {account.error}
+              <div
+                className={`alert ${account.authExpired ? 'warning' : 'error'}`}
+                key={account.brokerAccountId}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '12px',
+                  backgroundColor: account.authExpired ? '#fef2f2' : undefined,
+                  borderColor: account.authExpired ? '#fca5a5' : undefined,
+                  color: account.authExpired ? '#991b1b' : undefined,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {account.authExpired ? <AlertTriangle size={18} color="#dc2626" /> : null}
+                  <span>
+                    <strong>{account.displayName}</strong>: {account.error}
+                  </span>
+                </div>
+                {account.authExpired && (
+                  <Link
+                    to="/accounts"
+                    className="primary-button"
+                    style={{
+                      padding: '4px 10px',
+                      fontSize: '12px',
+                      textDecoration: 'none',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      backgroundColor: '#dc2626',
+                      borderColor: '#b91c1c',
+                      color: '#ffffff',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <LogIn size={13} /> Re-authenticate
+                  </Link>
+                )}
               </div>
             ))}
           </div>

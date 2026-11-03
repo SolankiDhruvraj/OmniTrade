@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { BarChart2, CheckCircle2, Loader2, Plus, RefreshCcw, Search, Send, ShieldAlert, Trash2, X } from 'lucide-react'
+import { AlertTriangle, BarChart2, CheckCircle2, Loader2, LogIn, Plus, RefreshCcw, Search, Send, ShieldAlert, Trash2, X } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { apiRequest } from '../api/client.js'
 import { CustomSelect } from '../components/CustomSelect.jsx'
 import { StockChartModal } from '../components/StockChartModal.jsx'
@@ -150,10 +151,19 @@ export const TradePage = () => {
     apiRequest('/broker-accounts/funds')
       .then((fundsRes) => {
         const fundsMap = {}
+        const expiredMap = {}
         ;(fundsRes.accounts || []).forEach((item) => {
           fundsMap[item.brokerAccountId] = item.funds
+          if (item.authExpired) {
+            expiredMap[item.brokerAccountId] = true
+          }
         })
         setAccountFunds(fundsMap)
+        if (Object.keys(expiredMap).length > 0) {
+          setAccounts((prev) => prev.map((acc) => expiredMap[acc.id] ? { ...acc, authStatus: 'expired' } : acc))
+          // Automatically uncheck expired accounts so user doesn't submit failing orders
+          setSelectedAccounts((prev) => prev.filter((id) => !expiredMap[id]))
+        }
       })
       .catch(() => {})
       .finally(() => setLoadingFunds(false))
@@ -473,6 +483,7 @@ export const TradePage = () => {
           ) : (
             <div className="checkbox-grid">
               {accounts.map((account) => {
+                const isExpired = account.authStatus === 'expired'
                 const isSelected = selectedAccounts.includes(account.id)
                 const funds = accountFunds[account.id]
                 const multiplier = accountMultipliers[account.id] || 1
@@ -480,12 +491,19 @@ export const TradePage = () => {
                 return (
                   <div
                     key={account.id}
-                    className={`check-card ${isSelected ? 'selected' : ''}`}
-                    style={{ display: 'flex', flexDirection: 'column', gap: 8, cursor: 'default' }}
+                    className={`check-card ${isSelected ? 'selected' : ''} ${isExpired ? 'expired' : ''}`}
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 8,
+                      cursor: 'default',
+                      ...(isExpired ? { borderColor: '#fca5a5', backgroundColor: '#fff5f5' } : {}),
+                    }}
                   >
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', width: '100%' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: isExpired ? 'not-allowed' : 'pointer', width: '100%' }}>
                       <input
                         checked={isSelected}
+                        disabled={isExpired}
                         onChange={() => toggleAccount(account.id)}
                         type="checkbox"
                       />
@@ -498,48 +516,85 @@ export const TradePage = () => {
                       </div>
                     </label>
 
-                    {/* Funds & Smart Multiplier Controls */}
-                    <div
-                      style={{
-                        paddingTop: 8,
-                        marginTop: 4,
-                        borderTop: '1px solid #edf2f7',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        gap: 8,
-                        fontSize: 12,
-                      }}
-                    >
-                      <div style={{ color: '#475569', display: 'flex', alignItems: 'center', gap: 4, minWidth: 0, overflow: 'hidden' }}>
-                        <span style={{ color: '#94a3b8', fontSize: 11 }}>Funds:</span>
-                        <strong style={{ fontSize: 12, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {funds ? `₹${Math.round(funds.availableCash || funds.availableMargin || 0).toLocaleString('en-IN')}` : (loadingFunds ? '...' : '—')}
-                        </strong>
-                      </div>
-
-                      {isSelected && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-                          <span style={{ color: '#94a3b8', fontSize: 11, fontWeight: 500 }}>Multiplier:</span>
-                          <select
-                            className="multiplier-select"
-                            value={multiplier}
-                            onChange={(e) => {
-                              const val = Number(e.target.value) || 1
-                              setAccountMultipliers((prev) => ({ ...prev, [account.id]: val }))
-                            }}
-                            title="Multiplier"
-                          >
-                            <option value={1}>1×</option>
-                            <option value={2}>2×</option>
-                            <option value={3}>3×</option>
-                            <option value={4}>4×</option>
-                            <option value={5}>5×</option>
-                            <option value={10}>10×</option>
-                          </select>
+                    {isExpired ? (
+                      <div
+                        style={{
+                          paddingTop: 8,
+                          marginTop: 4,
+                          borderTop: '1px solid #fee2e2',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 6,
+                          fontSize: 12,
+                        }}
+                      >
+                        <div style={{ color: '#b91c1c', display: 'flex', alignItems: 'center', gap: 5, fontWeight: 500 }}>
+                          <AlertTriangle size={13} /> Auth expired, please authenticate again
                         </div>
-                      )}
-                    </div>
+                        <Link
+                          to="/accounts"
+                          style={{
+                            color: '#ffffff',
+                            backgroundColor: '#dc2626',
+                            padding: '4px 8px',
+                            borderRadius: '4px',
+                            textDecoration: 'none',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '4px',
+                            width: 'fit-content',
+                          }}
+                        >
+                          <LogIn size={12} /> Re-authenticate Account
+                        </Link>
+                      </div>
+                    ) : (
+                      /* Funds & Smart Multiplier Controls */
+                      <div
+                        style={{
+                          paddingTop: 8,
+                          marginTop: 4,
+                          borderTop: '1px solid #edf2f7',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          gap: 8,
+                          fontSize: 12,
+                        }}
+                      >
+                        <div style={{ color: '#475569', display: 'flex', alignItems: 'center', gap: 4, minWidth: 0, overflow: 'hidden' }}>
+                          <span style={{ color: '#94a3b8', fontSize: 11 }}>Funds:</span>
+                          <strong style={{ fontSize: 12, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {funds ? `₹${Math.round(funds.availableCash || funds.availableMargin || 0).toLocaleString('en-IN')}` : (loadingFunds ? '...' : '—')}
+                          </strong>
+                        </div>
+
+                        {isSelected && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                            <span style={{ color: '#94a3b8', fontSize: 11, fontWeight: 500 }}>Multiplier:</span>
+                            <select
+                              className="multiplier-select"
+                              value={multiplier}
+                              onChange={(e) => {
+                                const val = Number(e.target.value) || 1
+                                setAccountMultipliers((prev) => ({ ...prev, [account.id]: val }))
+                              }}
+                              title="Multiplier"
+                            >
+                              <option value={1}>1×</option>
+                              <option value={2}>2×</option>
+                              <option value={3}>3×</option>
+                              <option value={4}>4×</option>
+                              <option value={5}>5×</option>
+                              <option value={10}>10×</option>
+                            </select>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )
               })}
