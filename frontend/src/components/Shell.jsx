@@ -125,11 +125,11 @@ export const Shell = () => {
           <NavLink to="/orders"><ShieldCheck size={15} /> Orders</NavLink>
           <NavLink to="/holdings"><Briefcase size={15} /> Holdings</NavLink>
           <NavLink to="/positions"><Activity size={15} /> Positions</NavLink>
+          <NavLink to="/logs"><FileText size={15} /> Logs</NavLink>
           {user?.isAdmin && (
             <>
               <NavLink to="/admin/accounts"><UserCheck size={15} /> All Accounts</NavLink>
               <NavLink to="/admin/transactions"><History size={15} /> All Transactions</NavLink>
-              <NavLink to="/admin/logs"><FileText size={15} /> Logs</NavLink>
               <NavLink to="/admin/invitations"><UserPlus size={15} /> Invitations</NavLink>
             </>
           )}
@@ -284,13 +284,13 @@ export const Shell = () => {
               <NavLink to="/orders"><ShieldCheck size={18} /> Orders</NavLink>
               <NavLink to="/holdings"><Briefcase size={18} /> Holdings</NavLink>
               <NavLink to="/positions"><Activity size={18} /> Positions</NavLink>
+              <NavLink to="/logs"><FileText size={18} /> Logs</NavLink>
               <NavLink to="/api-guide"><BookOpen size={18} /> API Setup Guide</NavLink>
               <NavLink to="/security"><KeyRound size={18} /> Security &amp; 2FA</NavLink>
               {user?.isAdmin && (
                 <>
                   <NavLink to="/admin/accounts"><UserCheck size={18} /> All Accounts</NavLink>
                   <NavLink to="/admin/transactions"><History size={18} /> All Transactions</NavLink>
-                  <NavLink to="/admin/logs"><FileText size={18} /> Activity Logs</NavLink>
                   <NavLink to="/admin/invitations"><UserPlus size={18} /> Invitations</NavLink>
                 </>
               )}

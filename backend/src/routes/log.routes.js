@@ -1,17 +1,17 @@
 import { Router } from "express";
 import { AuditLog } from "../models/AuditLog.js";
 import { requireAuth } from "../middlewares/auth.js";
-import { requireAdmin } from "../middlewares/requireAdmin.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import { isAdminUser } from "../utils/adminAccess.js";
 
 const router = Router();
 
 router.use(requireAuth);
-router.use(requireAdmin);
 
 /**
- * GET /api/v1/admin/logs
- * List audit logs with pagination and filters
+ * GET /api/v1/logs
+ * - Regular users see ONLY their own activity logs.
+ * - Administrators see all system logs by default, or can filter by specific user.
  */
 router.get("/", asyncHandler(async (req, res) => {
   const page = Math.max(1, Number(req.query.page) || 1);
@@ -21,23 +21,53 @@ router.get("/", asyncHandler(async (req, res) => {
   const category = req.query.category;
   const status = req.query.status;
   const search = req.query.search || req.query.q || "";
+  const isAdmin = isAdminUser(req.user);
 
   const filter = {};
+
+  // Access Control: Non-admins strictly scoped to their own logs
+  if (!isAdmin) {
+    filter.$or = [
+      { user: req.user._id },
+      { userEmail: req.user.email?.toLowerCase() },
+    ];
+  } else if (req.query.scope === "mine") {
+    // Admin optionally viewing only their own logs
+    filter.$or = [
+      { user: req.user._id },
+      { userEmail: req.user.email?.toLowerCase() },
+    ];
+  }
+
   if (category && category !== "all") {
     filter.category = category;
   }
   if (status && status !== "all") {
     filter.status = status;
   }
+
   if (search && search.trim()) {
     const sRegex = new RegExp(search.trim(), "i");
-    filter.$or = [
+    const searchConditions = [
       { message: sRegex },
-      { userEmail: sRegex },
-      { userName: sRegex },
       { action: sRegex },
       { ip: sRegex },
     ];
+    if (isAdmin) {
+      searchConditions.push({ userEmail: sRegex });
+      searchConditions.push({ userName: sRegex });
+    }
+
+    if (filter.$or) {
+      // Combine ownership constraint with search condition using $and
+      filter.$and = [
+        { $or: filter.$or },
+        { $or: searchConditions },
+      ];
+      delete filter.$or;
+    } else {
+      filter.$or = searchConditions;
+    }
   }
 
   const [logs, totalCount] = await Promise.all([
@@ -50,6 +80,7 @@ router.get("/", asyncHandler(async (req, res) => {
   ]);
 
   res.json({
+    isAdmin,
     logs: logs.map((log) => ({
       id: log._id,
       user: log.user ? {

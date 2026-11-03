@@ -21,15 +21,18 @@ import {
   XCircle,
 } from 'lucide-react'
 import { apiRequest } from '../api/client.js'
+import { useAuth } from '../context/useAuth.js'
 
 const PAGE_SIZE = 20
 
 export const AdminLogsPage = () => {
+  const { user } = useAuth()
   const [logs, setLogs] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [scopeFilter, setScopeFilter] = useState('all') // 'all' (all users for admin) or 'mine'
   const [searchTerm, setSearchTerm] = useState('')
   const [appliedSearch, setAppliedSearch] = useState('')
   const [pagination, setPagination] = useState({
@@ -41,7 +44,7 @@ export const AdminLogsPage = () => {
     hasNextPage: false,
   })
 
-  const loadLogs = async (targetPage = 1, search = appliedSearch, cat = categoryFilter, stat = statusFilter) => {
+  const loadLogs = async (targetPage = 1, search = appliedSearch, cat = categoryFilter, stat = statusFilter, sc = scopeFilter) => {
     setLoading(true)
     setError('')
     try {
@@ -51,9 +54,10 @@ export const AdminLogsPage = () => {
       })
       if (cat !== 'all') params.append('category', cat)
       if (stat !== 'all') params.append('status', stat)
+      if (user?.isAdmin && sc === 'mine') params.append('scope', 'mine')
       if (search.trim()) params.append('search', search.trim())
 
-      const data = await apiRequest(`/admin/logs?${params.toString()}`)
+      const data = await apiRequest(`/logs?${params.toString()}`)
       setLogs(data.logs || [])
       if (data.pagination) setPagination(data.pagination)
     } catch (err) {
@@ -64,24 +68,24 @@ export const AdminLogsPage = () => {
   }
 
   useEffect(() => {
-    loadLogs(1, appliedSearch, categoryFilter, statusFilter)
-  }, [categoryFilter, statusFilter])
+    loadLogs(1, appliedSearch, categoryFilter, statusFilter, scopeFilter)
+  }, [categoryFilter, statusFilter, scopeFilter])
 
   const handleSearchSubmit = (e) => {
     e.preventDefault()
     setAppliedSearch(searchTerm)
-    loadLogs(1, searchTerm, categoryFilter, statusFilter)
+    loadLogs(1, searchTerm, categoryFilter, statusFilter, scopeFilter)
   }
 
   const handleClearSearch = () => {
     setSearchTerm('')
     setAppliedSearch('')
-    loadLogs(1, '', categoryFilter, statusFilter)
+    loadLogs(1, '', categoryFilter, statusFilter, scopeFilter)
   }
 
   const handlePageChange = (newPage) => {
     if (newPage < 1 || newPage > pagination.totalPages || newPage === pagination.page) return
-    loadLogs(newPage, appliedSearch, categoryFilter, statusFilter)
+    loadLogs(newPage, appliedSearch, categoryFilter, statusFilter, scopeFilter)
   }
 
   const getActionBadge = (action, category) => {
@@ -131,14 +135,25 @@ export const AdminLogsPage = () => {
     <section className="page-stack">
       <div className="page-header">
         <div>
-          <h1>Audit &amp; Activity Logs</h1>
-          <p>Real-time audit trail of user logins, broker authentications, order placements, and security events.</p>
+          <h1>Activity Logs</h1>
+          <p>{user?.isAdmin ? 'Audit trail of user logins, broker authentications, order placements, and security events.' : 'Your personal activity history, logins, and broker events.'}</p>
         </div>
         <div className="toolbar">
+          {user?.isAdmin && (
+            <button
+              className={scopeFilter === 'all' ? 'primary-button' : 'secondary-button'}
+              onClick={() => setScopeFilter((prev) => (prev === 'all' ? 'mine' : 'all'))}
+              type="button"
+              style={{ fontSize: '13px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+              title="Toggle between all system logs and only your personal logs"
+            >
+              <Users size={15} /> {scopeFilter === 'all' ? 'Viewing All Users' : 'Viewing My Logs Only'}
+            </button>
+          )}
           <button
             className="secondary-button"
             disabled={loading}
-            onClick={() => loadLogs(pagination.page, appliedSearch, categoryFilter, statusFilter)}
+            onClick={() => loadLogs(pagination.page, appliedSearch, categoryFilter, statusFilter, scopeFilter)}
             title="Refresh logs"
             type="button"
           >
@@ -266,7 +281,7 @@ export const AdminLogsPage = () => {
                 <thead>
                   <tr>
                     <th>Timestamp</th>
-                    <th>User</th>
+                    {user?.isAdmin && <th>User</th>}
                     <th>Action</th>
                     <th>Category</th>
                     <th>Status</th>
@@ -286,14 +301,16 @@ export const AdminLogsPage = () => {
                           second: '2-digit',
                         })}
                       </td>
-                      <td>
-                        <strong style={{ fontSize: 13, color: 'var(--ink-heading)', display: 'block' }}>
-                          {log.user?.name || log.user?.email || 'System / Anonymous'}
-                        </strong>
-                        {log.user?.email && log.user?.name && (
-                          <small style={{ color: 'var(--muted)', fontSize: 11 }}>{log.user.email}</small>
-                        )}
-                      </td>
+                      {user?.isAdmin && (
+                        <td>
+                          <strong style={{ fontSize: 13, color: 'var(--ink-heading)', display: 'block' }}>
+                            {log.user?.name || log.user?.email || 'System / Anonymous'}
+                          </strong>
+                          {log.user?.email && log.user?.name && (
+                            <small style={{ color: 'var(--muted)', fontSize: 11 }}>{log.user.email}</small>
+                          )}
+                        </td>
+                      )}
                       <td>{getActionBadge(log.action, log.category)}</td>
                       <td>
                         <span className="badge" style={{ textTransform: 'capitalize', fontSize: 11 }}>

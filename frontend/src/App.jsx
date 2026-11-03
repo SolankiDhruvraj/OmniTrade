@@ -43,6 +43,7 @@ const App = () => {
             <Route path="orders" element={<OrdersPage />} />
             <Route path="holdings" element={<HoldingsPage />} />
             <Route path="positions" element={<PositionsPage />} />
+            <Route path="logs" element={<AdminLogsPage />} />
             <Route path="security" element={<SecurityPage />} />
             <Route path="api-guide" element={<ApiDocsPage />} />
             <Route
@@ -71,11 +72,7 @@ const App = () => {
             />
             <Route
               path="admin/logs"
-              element={(
-                <ProtectedAdminRoute>
-                  <AdminLogsPage />
-                </ProtectedAdminRoute>
-              )}
+              element={<AdminLogsPage />}
             />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
